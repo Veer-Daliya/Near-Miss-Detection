@@ -1,0 +1,5 @@
+# Ruff configuration file
+# This file is kept for compatibility, but pyproject.toml takes precedence
+
+line-length = 88
+

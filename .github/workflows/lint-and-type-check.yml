@@ -1,0 +1,41 @@
+name: Lint and Type Check
+
+# This workflow runs linting, formatting, and type checking.
+# To block merges that fail these checks, set up branch protection rules
+# in GitHub Settings → Branches. See .github/BRANCH_PROTECTION.md for details.
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint-and-type-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff mypy black
+    
+    - name: Run Ruff linter
+      run: |
+        ruff check .
+    
+    - name: Check code formatting with Black
+      run: |
+        black --check --line-length 88 .
+    
+    - name: Run type checking with mypy
+      run: |
+        mypy . --ignore-missing-imports
+
