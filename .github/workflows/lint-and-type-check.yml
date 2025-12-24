@@ -29,13 +29,25 @@ jobs:
     
     - name: Run Ruff linter
       run: |
-        ruff check .
+        if find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./venv/*" | grep -q .; then
+          ruff check .
+        else
+          echo "No Python files found, skipping Ruff"
+        fi
     
     - name: Check code formatting with Black
       run: |
-        black --check --line-length 88 .
+        if find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./venv/*" | grep -q .; then
+          black --check --line-length 88 .
+        else
+          echo "No Python files found, skipping Black"
+        fi
     
     - name: Run type checking with mypy
       run: |
-        mypy . --ignore-missing-imports
+        if find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./venv/*" | grep -q .; then
+          mypy . --ignore-missing-imports
+        else
+          echo "No Python files found, skipping mypy"
+        fi
 
