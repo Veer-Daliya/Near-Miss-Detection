@@ -52,10 +52,6 @@ curl -X PUT "${API_URL}" \
     "allow_force_pushes": false,
     "allow_deletions": false,
     "required_linear_history": true,
-    "allow_squash_merge": true,
-    "allow_merge_commit": false,
-    "allow_rebase_merge": true,
-    "block_creations": false,
     "required_conversation_resolution": true
   }'
 
