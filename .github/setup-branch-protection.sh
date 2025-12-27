@@ -28,12 +28,14 @@ if [ -z "$GITHUB_REPO" ]; then
 fi
 
 BRANCH="${BRANCH:-main}"
-API_URL="https://api.github.com/repos/${GITHUB_REPO}/branches/${BRANCH}/protection"
+BRANCH_PROTECTION_URL="https://api.github.com/repos/${GITHUB_REPO}/branches/${BRANCH}/protection"
+REPO_SETTINGS_URL="https://api.github.com/repos/${GITHUB_REPO}"
 
 echo "Setting up branch protection for '${BRANCH}' branch in ${GITHUB_REPO}..."
 
 # Set up branch protection with required status checks
-curl -X PUT "${API_URL}" \
+# Note: This endpoint only accepts branch protection parameters
+curl -X PUT "${BRANCH_PROTECTION_URL}" \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer ${GITHUB_TOKEN}" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -52,16 +54,32 @@ curl -X PUT "${API_URL}" \
     "allow_force_pushes": false,
     "allow_deletions": false,
     "required_linear_history": true,
-    "allow_squash_merge": true,
-    "allow_merge_commit": false,
-    "allow_rebase_merge": true,
-    "block_creations": false,
     "required_conversation_resolution": true
   }'
 
 echo ""
 echo "✅ Branch protection configured successfully!"
+
+echo ""
+echo "Configuring repository merge settings..."
+
+# Configure repository-level merge settings
+# These are separate from branch protection and use the repository settings endpoint
+curl -X PATCH "${REPO_SETTINGS_URL}" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  -d '{
+    "allow_squash_merge": true,
+    "allow_merge_commit": false,
+    "allow_rebase_merge": true
+  }'
+
+echo ""
+echo "✅ Repository merge settings configured successfully!"
 echo ""
 echo "The '${BRANCH}' branch is now protected. Pull requests must pass"
 echo "the 'lint-and-type-check' workflow before they can be merged."
+echo ""
+echo "Merge settings: squash merge ✓, merge commit ✗, rebase merge ✓"
 
