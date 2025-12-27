@@ -1,0 +1,38 @@
+# Cursor Rules for Near-Miss-Detection Project
+
+## File Creation Policy
+**CRITICAL: Do NOT create new files without explicit user approval.**
+- Always ask the user before creating any new files, directories, or documentation
+- Do not create test files, example files, or documentation files unless explicitly requested
+- Do not create temporary files, backup files, or helper scripts without permission
+- Only modify existing files unless the user specifically asks for new files
+
+## Code Style and Standards
+- Follow Python 3.11 conventions
+- Use Black formatter with line length of 88 characters
+- Follow Ruff linting rules as configured in pyproject.toml
+- Use type hints where appropriate (mypy is configured)
+- Write clear, readable code with meaningful variable names
+
+## Project Structure
+- Respect the existing project structure
+- Do not reorganize files or directories without user approval
+- Follow Python package conventions
+
+## Git Workflow
+- Work on the current branch (veer/agent-file)
+- Do not commit changes unless explicitly asked
+- Do not force push or modify git history without permission
+
+## General Guidelines
+- Be concise and focused in code changes
+- Explain what you're doing when making significant changes
+- Ask for clarification if requirements are unclear
+- Prefer editing existing files over creating new ones
+- Test changes when possible before suggesting them
+
+## Error Handling
+- Fix linter errors when making code changes
+- Address type checking issues when modifying code
+- Ensure code follows project conventions
+
