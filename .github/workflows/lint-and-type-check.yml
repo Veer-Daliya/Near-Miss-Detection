@@ -1,0 +1,53 @@
+name: Lint and Type Check
+
+# This workflow runs linting, formatting, and type checking.
+# To block merges that fail these checks, set up branch protection rules
+# in GitHub Settings → Branches. See .github/BRANCH_PROTECTION.md for details.
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint-and-type-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff mypy black
+    
+    - name: Run Ruff linter
+      run: |
+        if find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./venv/*" | grep -q .; then
+          ruff check .
+        else
+          echo "No Python files found, skipping Ruff"
+        fi
+    
+    - name: Check code formatting with Black
+      run: |
+        if find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./venv/*" | grep -q .; then
+          black --check --line-length 88 .
+        else
+          echo "No Python files found, skipping Black"
+        fi
+    
+    - name: Run type checking with mypy
+      run: |
+        if find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./venv/*" | grep -q .; then
+          mypy . --ignore-missing-imports
+        else
+          echo "No Python files found, skipping mypy"
+        fi
+
