@@ -1,0 +1,23 @@
+# Default configuration for detection pipeline
+
+camera:
+  type: fixed
+  source: ""  # Set via command line --source argument
+  fps: 10  # Target FPS for processing
+
+detection:
+  model: yolov8m  # Options: yolov8n, yolov8s, yolov8m, yolov8l, yolov8x
+  confidence_threshold: 0.4
+  classes: [person, car, truck, bus, motorcycle, bicycle]
+
+lpr:
+  enabled: true
+  plate_detector_confidence: 0.3
+  ocr_engine: paddleocr  # Options: paddleocr, easyocr
+  min_plate_confidence: 0.4
+
+output:
+  save_annotated: true
+  save_json: true
+  output_dir: ./data/outputs
+
