@@ -4,6 +4,7 @@ numpy>=1.24.0
 
 # Object detection
 ultralytics>=8.0.0
+lap>=0.5.12  # Required for ByteTracker
 
 # OCR (choose one or both)
 # PaddleOCR (recommended)
@@ -16,4 +17,5 @@ paddleocr>=2.7.0
 # Optional: For better performance
 # torch>=2.0.0  # If using GPU
 # torchvision>=0.15.0
+
 

@@ -223,3 +223,4 @@ __marimo__/
 *.json
 data/outputs/
 data/samples/
+data/models/

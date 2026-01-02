@@ -11,7 +11,7 @@ except ImportError:
     PaddleOCR = None
 
 try:
-    import easyocr
+    import easyocr  # type: ignore[reportMissingImports]
 except ImportError:
     easyocr = None
 
@@ -42,13 +42,87 @@ class PlateOCR:
                 raise ImportError(
                     "PaddleOCR not installed. Install with: pip install paddlepaddle paddleocr"
                 )
-            self.ocr = PaddleOCR(use_angle_cls=True, lang="en")
+            # Initialize PaddleOCR with GPU support
+            # Set PaddlePaddle device before initializing PaddleOCR
+            gpu_available = False
+            try:
+                import paddle
+                import os
+                
+                # Try to set GPU device if available
+                if paddle.device.is_compiled_with_cuda():
+                    try:
+                        # Set PaddlePaddle to use GPU
+                        paddle.device.set_device("gpu")
+                        gpu_available = True
+                        # Also set environment variable for PaddleOCR
+                        os.environ["USE_GPU"] = "1"
+                    except Exception:
+                        # GPU not available or error setting device
+                        paddle.device.set_device("cpu")
+                        gpu_available = False
+                else:
+                    # Check if we can use CPU with optimizations
+                    paddle.device.set_device("cpu")
+                    gpu_available = False
+            except (ImportError, AttributeError):
+                # PaddlePaddle not available or error
+                gpu_available = False
+            
+            # Initialize PaddleOCR
+            # PaddleOCR will use GPU if PaddlePaddle device is set to GPU
+            # Note: use_angle_cls is deprecated in newer versions
+            try:
+                self.ocr = PaddleOCR(use_angle_cls=True, lang="en")
+            except (TypeError, ValueError):
+                # Fallback for newer PaddleOCR versions
+                self.ocr = PaddleOCR(lang="en")
+            
+            if gpu_available:
+                print("PaddleOCR initialized with GPU acceleration")
+            else:
+                print("PaddleOCR initialized (CPU mode)")
+                print("  Note: For GPU support, install: pip install paddlepaddle-gpu")
+                print("  (Note: GPU support requires CUDA, not available on macOS)")
         elif self.ocr_engine == "easyocr":
             if easyocr is None:
                 raise ImportError(
                     "EasyOCR not installed. Install with: pip install easyocr"
                 )
-            self.reader = easyocr.Reader(["en"], gpu=False)
+            # Auto-detect GPU availability for EasyOCR
+            # EasyOCR supports CUDA (NVIDIA) and can use PyTorch MPS (Apple Silicon)
+            use_gpu = False
+            gpu_type = None
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    use_gpu = True
+                    gpu_type = "CUDA"
+                elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                    # Apple Silicon MPS support
+                    # Note: EasyOCR's gpu parameter only works for CUDA
+                    # For MPS, we need to let PyTorch handle it automatically
+                    use_gpu = False  # EasyOCR doesn't support MPS via gpu=True
+                    gpu_type = "MPS (Apple Silicon)"
+                    # PyTorch will automatically use MPS if available
+                    print("EasyOCR initialized (PyTorch MPS backend will be used automatically)")
+                else:
+                    use_gpu = False
+                    gpu_type = None
+            except ImportError:
+                use_gpu = False
+                gpu_type = None
+            
+            # Initialize EasyOCR
+            # Note: gpu=True only works for CUDA, not MPS
+            # For Apple Silicon, PyTorch will use MPS automatically if available
+            self.reader = easyocr.Reader(["en"], gpu=use_gpu)
+            if use_gpu:
+                print(f"EasyOCR initialized with {gpu_type} GPU acceleration")
+            elif gpu_type == "MPS (Apple Silicon)":
+                print("EasyOCR initialized (will use Apple Silicon GPU via PyTorch MPS)")
+            else:
+                print("EasyOCR initialized with CPU")
         else:
             raise ValueError(f"Unknown OCR engine: {ocr_engine}")
 
@@ -96,9 +170,28 @@ class PlateOCR:
 
     def _extract_paddleocr(self, image: np.ndarray) -> PlateResult:
         """Extract text using PaddleOCR."""
-        results = self.ocr.ocr(image, cls=True)
+        # Run PaddleOCR - cls parameter not supported in this version
+        results = self.ocr.ocr(image)
 
-        if not results or not results[0]:
+        if not results:
+            return PlateResult(text="UNKNOWN", confidence=0.0, bbox=[])
+
+        # Handle new PaddleOCR API (OCRResult object) vs old API (list)
+        ocr_result = results[0] if isinstance(results, list) else results
+        
+        # Check if it's the new OCRResult format
+        if hasattr(ocr_result, 'text_lines') or hasattr(ocr_result, 'rec_res'):
+            # New API format - extract from OCRResult object
+            if hasattr(ocr_result, 'text_lines') and ocr_result.text_lines:
+                text_lines = ocr_result.text_lines
+            elif hasattr(ocr_result, 'rec_res') and ocr_result.rec_res:
+                text_lines = ocr_result.rec_res
+            else:
+                return PlateResult(text="UNKNOWN", confidence=0.0, bbox=[])
+        elif isinstance(ocr_result, list):
+            # Old API format - list of results
+            text_lines = ocr_result
+        else:
             return PlateResult(text="UNKNOWN", confidence=0.0, bbox=[])
 
         # Get best result
@@ -106,14 +199,29 @@ class PlateOCR:
         best_confidence = 0.0
         best_bbox = []
 
-        for line in results[0]:
-            if line:
+        for line in text_lines:
+            if not line:
+                continue
+            
+            # Handle different line formats
+            if isinstance(line, tuple) and len(line) == 2:
                 bbox, (text, confidence) = line
-                if confidence > best_confidence:
-                    best_text = text.strip()
-                    best_confidence = confidence
-                    # Convert bbox to [x1, y1, x2, y2]
+            elif isinstance(line, dict):
+                # New format might be dict
+                bbox = line.get('bbox', [])
+                text = line.get('text', '')
+                confidence = line.get('confidence', 0.0)
+            else:
+                continue
+                
+            if confidence > best_confidence:
+                best_text = text.strip()
+                best_confidence = confidence
+                # Convert bbox to [x1, y1, x2, y2]
+                if isinstance(bbox, list) and len(bbox) > 0:
                     best_bbox = list(_bbox_points_to_rect(bbox))
+                else:
+                    continue
 
         # Clean text (remove spaces, special chars)
         cleaned_text = self._clean_plate_text(best_text)

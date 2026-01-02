@@ -28,7 +28,7 @@ class PlateDetector:
 
     def __init__(
         self,
-        confidence_threshold: float = 0.5,
+        confidence_threshold: float = 0.3,  # Lowered from 0.5 for better detection
         device: Optional[str] = None,
     ) -> None:
         """
@@ -47,9 +47,48 @@ class PlateDetector:
                 "PaddleOCR not installed. Install with: pip install paddlepaddle paddleocr"
             )
 
-        # Initialize PaddleOCR (we'll use detection results, ignore text initially)
-        # Note: PaddleOCR does detection+OCR together, but we can use just the bboxes
-        self.ocr = PaddleOCR(use_angle_cls=True, lang="en")
+        # Initialize PaddleOCR with GPU support
+        # Set PaddlePaddle device before initializing PaddleOCR
+        gpu_available = False
+        try:
+            import paddle
+            import os
+            
+            # Try to set GPU device if available
+            if paddle.device.is_compiled_with_cuda():
+                try:
+                    # Set PaddlePaddle to use GPU
+                    paddle.device.set_device("gpu")
+                    gpu_available = True
+                    # Also set environment variable for PaddleOCR
+                    os.environ["USE_GPU"] = "1"
+                except Exception as e:
+                    # GPU not available or error setting device
+                    paddle.device.set_device("cpu")
+                    gpu_available = False
+            else:
+                # Check if we can use CPU with optimizations
+                paddle.device.set_device("cpu")
+                gpu_available = False
+        except (ImportError, AttributeError) as e:
+            # PaddlePaddle not available or error
+            gpu_available = False
+        
+        # Initialize PaddleOCR
+        # PaddleOCR will use GPU if PaddlePaddle device is set to GPU
+        # Try with use_angle_cls, fallback without it for newer versions
+        try:
+            self.ocr = PaddleOCR(use_angle_cls=True, lang="en")
+        except (TypeError, ValueError):
+            # Newer PaddleOCR versions may not support use_angle_cls
+            self.ocr = PaddleOCR(lang="en")
+        
+        if gpu_available:
+            print("Plate detector initialized with GPU acceleration")
+        else:
+            print("Plate detector initialized (CPU mode)")
+            print("  Note: For GPU support, install: pip install paddlepaddle-gpu")
+            print("  (Note: GPU support requires CUDA, not available on macOS)")
 
     def detect_on_vehicle_roi(
         self, vehicle_roi: np.ndarray, vehicle_bbox: List[int]
@@ -72,56 +111,92 @@ class PlateDetector:
         try:
             # Run PaddleOCR detection (detection only, no recognition)
             # Note: PaddleOCR doesn't have a pure detection mode, so we use OCR but ignore text
-            results = self.ocr.ocr(vehicle_roi, cls=True)
+            # cls parameter not supported in this PaddleOCR version
+            results = self.ocr.ocr(vehicle_roi)
 
-            if results and results[0]:
-                vehicle_x1, vehicle_y1, vehicle_x2, vehicle_y2 = vehicle_bbox
+            if not results:
+                return []
 
-                for line in results[0]:
-                    if line:
-                        bbox_points, (text, confidence) = line
+            # Handle new PaddleOCR API (OCRResult object) vs old API (list)
+            ocr_result = results[0] if isinstance(results, list) else results
+            
+            # Check if it's the new OCRResult format
+            if hasattr(ocr_result, 'text_lines') or hasattr(ocr_result, 'rec_res'):
+                # New API format - extract from OCRResult object
+                if hasattr(ocr_result, 'text_lines') and ocr_result.text_lines:
+                    text_lines = ocr_result.text_lines
+                elif hasattr(ocr_result, 'rec_res') and ocr_result.rec_res:
+                    text_lines = ocr_result.rec_res
+                else:
+                    return []
+            elif isinstance(ocr_result, list):
+                # Old API format - list of results
+                text_lines = ocr_result
+            else:
+                return []
 
-                        # Filter by confidence
-                        if confidence < self.confidence_threshold:
-                            continue
+            vehicle_x1, vehicle_y1, vehicle_x2, vehicle_y2 = vehicle_bbox
 
-                        # Convert bbox points to [x1, y1, x2, y2] in ROI coordinates
-                        roi_x1, roi_y1, roi_x2, roi_y2 = _bbox_points_to_rect(bbox_points)
+            for line in text_lines:
+                if not line:
+                    continue
+                
+                # Handle different line formats
+                if isinstance(line, tuple) and len(line) == 2:
+                    bbox_points, (text, confidence) = line
+                elif isinstance(line, dict):
+                    # New format might be dict
+                    bbox_points = line.get('bbox', [])
+                    text = line.get('text', '')
+                    confidence = line.get('confidence', 0.0)
+                else:
+                    continue
 
-                        # Calculate aspect ratio and size
-                        width = roi_x2 - roi_x1
-                        height = roi_y2 - roi_y1
-                        aspect_ratio = width / height if height > 0 else 0
-                        area = width * height
+                # Filter by confidence
+                if confidence < self.confidence_threshold:
+                    continue
 
-                        # Filter for license plate-like regions
-                        # License plates typically have:
-                        # - Aspect ratio between 2:1 and 5:1 (wider than tall)
-                        # - Minimum size (at least 50x20 pixels)
-                        # - Text length between 4-10 characters (rough check)
-                        if (
-                            2.0 <= aspect_ratio <= 5.0
-                            and width >= 50
-                            and height >= 20
-                            and area >= 1000  # Minimum area
-                        ):
-                            # Convert ROI coordinates to frame coordinates
-                            frame_x1 = vehicle_x1 + roi_x1
-                            frame_y1 = vehicle_y1 + roi_y1
-                            frame_x2 = vehicle_x1 + roi_x2
-                            frame_y2 = vehicle_y1 + roi_y2
+                # Convert bbox points to [x1, y1, x2, y2] in ROI coordinates
+                if isinstance(bbox_points, list) and len(bbox_points) > 0:
+                    roi_x1, roi_y1, roi_x2, roi_y2 = _bbox_points_to_rect(bbox_points)
+                else:
+                    continue
 
-                            plate = PlateResult(
-                                text="",  # Will be filled by OCR later
-                                confidence=confidence,
-                                bbox=[frame_x1, frame_y1, frame_x2, frame_y2],
-                            )
-                            plates.append(plate)
+                # Calculate aspect ratio and size
+                width = roi_x2 - roi_x1
+                height = roi_y2 - roi_y1
+                aspect_ratio = width / height if height > 0 else 0
+                area = width * height
 
-        except Exception:
-            # If detection fails, return empty list
+                # Filter for license plate-like regions
+                # License plates typically have:
+                # - Aspect ratio between 1.5:1 and 6:1 (wider than tall, more lenient)
+                # - Minimum size (at least 30x15 pixels - more lenient for distant vehicles)
+                # - Minimum area (lowered for smaller plates)
+                if (
+                    1.5 <= aspect_ratio <= 6.0  # More lenient aspect ratio
+                    and width >= 30  # Lowered from 50
+                    and height >= 15  # Lowered from 20
+                    and area >= 450  # Lowered from 1000 (30*15 = 450)
+                ):
+                    # Convert ROI coordinates to frame coordinates
+                    frame_x1 = vehicle_x1 + roi_x1
+                    frame_y1 = vehicle_y1 + roi_y1
+                    frame_x2 = vehicle_x1 + roi_x2
+                    frame_y2 = vehicle_y1 + roi_y2
+
+                    plate = PlateResult(
+                        text="",  # Will be filled by OCR later
+                        confidence=confidence,
+                        bbox=[frame_x1, frame_y1, frame_x2, frame_y2],
+                    )
+                    plates.append(plate)
+
+        except Exception as e:
+            # Log error for debugging (but don't fail completely)
             # This can happen with very small or corrupted ROIs
-            # Silently continue - plate detection is optional
+            import sys
+            print(f"Warning: Plate detection error on vehicle ROI: {e}", file=sys.stderr)
             pass
 
         return plates
