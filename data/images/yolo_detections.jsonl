@@ -1,0 +1,1 @@
+{"image": "license.jpg", "detections": [{"bbox": [337, 263, 1308, 936], "class_name": "car", "class_id": 2, "confidence": 0.81494140625, "track_id": null}, {"bbox": [874, 334, 1005, 424], "class_name": "person", "class_id": 0, "confidence": 0.50439453125, "track_id": null}], "detection_count": 2}
