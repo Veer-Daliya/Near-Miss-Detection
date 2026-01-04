@@ -15,6 +15,7 @@ A computer vision pipeline for detecting pedestrian–vehicle collision risk, co
 - [Deployment](#deployment)
 - [Repository Structure](#repository-structure)
 - [Getting Started](#getting-started)
+- [Documentation](#documentation)
 - [Output Schema](#output-schema)
 
 ---
@@ -148,7 +149,7 @@ This system addresses three core objectives:
 
 #### Detector
 
-- **Recommended**: YOLOv8 or YOLOv10 (good speed/accuracy trade-off)
+- **Recommended**: YOLOv10 (faster, better for large objects like vehicles)
 - **Classes**: `person`, `car`, `truck`, `bus`, `motorcycle`, `bicycle`
 - **Confidence threshold**: 0.3–0.5 (tune per deployment)
 
@@ -567,7 +568,7 @@ Near-Miss-Detection/
 - CUDA-capable GPU (recommended for real-time)
 - FFmpeg (for video decoding)
 
-### Installation
+### Quick Start
 
 ```bash
 # Clone the repository
@@ -580,10 +581,14 @@ source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 
 # Install dependencies
 pip install -r requirements.txt
+pip install paddlepaddle paddleocr
+pip install lap
 
-# Download model weights (placeholder)
-python scripts/download_models.py
+# Run detection
+python scripts/run_detection.py --source data/samples/traffic_video.mp4
 ```
+
+**For detailed installation and usage instructions, see the [Getting Started Guide](docs/getting-started.md).**
 
 ### Configuration
 
@@ -596,7 +601,7 @@ camera:
   fps: 10
 
 detection:
-  model: yolov8m
+  model: yolov10m
   confidence_threshold: 0.4
   classes: [person, car, truck, bus, motorcycle]
 
@@ -640,7 +645,7 @@ camera:
   ptz_metadata_enabled: true
 
 detection:
-  model: yolov8m
+  model: yolov10m
   confidence_threshold: 0.4
   classes: [person, car, truck, bus, motorcycle]
 
@@ -680,14 +685,28 @@ output:
 
 ```bash
 # Run on a video file
-python scripts/run_pipeline.py --config configs/fixed_camera.yaml --source video.mp4
+python scripts/run_detection.py --source data/samples/traffic_video.mp4
+
+# Run with custom settings
+python scripts/run_detection.py --source video.mp4 --model-size s --fps 10
 
 # Run on RTSP stream
-python scripts/run_pipeline.py --config configs/ptz_camera.yaml --source rtsp://...
-
-# Run evaluation
-python scripts/evaluate.py --config configs/evaluation.yaml --ground_truth labels.json
+python scripts/run_detection.py --source rtsp://192.168.1.100:554/stream1
 ```
+
+**For detailed run options and configurations, see the [Running Guide](docs/running.md).**
+
+---
+
+## Documentation
+
+Comprehensive documentation is available in the `docs/` folder:
+
+- **[Getting Started](docs/getting-started.md)** - Installation, setup, and basic usage
+- **[Running the System](docs/running.md)** - Detailed run options, configurations, and examples
+- **[Performance Guide](docs/performance.md)** - Optimization tips and code-level optimizations
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+- **[Session Plan](docs/session-plan.md)** - Development roadmap and architecture
 
 ---
 
