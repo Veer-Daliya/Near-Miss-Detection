@@ -9,9 +9,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.detect import YOLODetector
-from src.ingest import VideoReader
-from tqdm import tqdm
+from src.detect import YOLODetector  # noqa: E402
+from src.ingest import VideoReader  # noqa: E402
+from tqdm import tqdm  # noqa: E402
 
 
 def quick_test(source: str, max_frames: int = 50) -> None:
@@ -49,7 +49,7 @@ def quick_test(source: str, max_frames: int = 50) -> None:
         
         pbar.close()
         
-        print(f"\n✅ Quick test complete!")
+        print("\n✅ Quick test complete!")
         print(f"   Processed: {frame_count} frames")
         print(f"   Total detections: {total_detections}")
         print(f"   Average detections per frame: {total_detections/frame_count:.1f}")
@@ -72,4 +72,6 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     quick_test(args.source, args.max_frames)
+
+
 

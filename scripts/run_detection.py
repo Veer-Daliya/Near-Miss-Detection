@@ -12,15 +12,21 @@ from typing import List, Optional
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-import cv2
-import numpy as np
-from tqdm import tqdm
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
+from tqdm import tqdm  # noqa: E402
 
-from src.detect import Detection, YOLODetector
-from src.ingest import VideoReader
-from src.lpr import PlateAggregator, PlateDetector, PlateOCR, PlateResult
-from src.track import ByteTracker
-from src.utils import draw_detections_with_labels
+from src.detect import Detection, YOLODetector  # noqa: E402
+from src.filter import filter_pedestrians_in_vehicles  # noqa: E402
+from src.ingest import VideoReader  # noqa: E402
+from src.lpr import PlateAggregator, PlateDetector, PlateOCR, PlateResult  # noqa: E402
+from src.track import (
+    ByteTracker,
+    get_pedestrian_tracks,
+    get_vehicle_tracks,
+    validate_track_ids,
+)  # noqa: E402
+from src.utils import draw_detections_with_labels  # noqa: E402
 
 
 # Cache vehicle class names for faster filtering
@@ -128,7 +134,6 @@ def _get_raw_ocr_data(ocr, plate_image: np.ndarray, ocr_result) -> dict:
                     if isinstance(ocr_result_data, dict):
                         rec_texts = ocr_result_data.get('rec_texts', [])
                         rec_scores = ocr_result_data.get('rec_scores', [])
-                        rec_polys = ocr_result_data.get('rec_polys', [])
                         
                         # Store all candidates
                         for text, score in zip(rec_texts, rec_scores):
@@ -262,7 +267,7 @@ def process_video(
     if batch_size > 1 and detector.device in ["cuda", "mps"]:
         print(f"GPU batch processing enabled: batch_size={batch_size}")
     elif batch_size > 1:
-        print(f"Warning: Batch size > 1 specified but GPU not available. Using batch_size=1")
+        print("Warning: Batch size > 1 specified but GPU not available. Using batch_size=1")
         batch_size = 1
     
     # Initialize plate detector (requires PaddleOCR)
@@ -276,7 +281,6 @@ def process_video(
     # Initialize OCR (optional - may fail if not installed)
     # Auto-select best OCR engine for GPU acceleration
     ocr = None
-    ocr_engine_used = None
     
     # Detect if we're on Apple Silicon (MPS GPU available)
     is_apple_silicon = False
@@ -292,13 +296,11 @@ def process_video(
         # Try EasyOCR first (supports Apple Silicon GPU via PyTorch MPS)
         try:
             ocr = PlateOCR(ocr_engine="easyocr")
-            ocr_engine_used = "EasyOCR (GPU-accelerated)"
             print("OCR initialized (EasyOCR with Apple Silicon GPU)")
         except ImportError:
             # Fallback to PaddleOCR (CPU only on macOS)
             try:
                 ocr = PlateOCR(ocr_engine="paddleocr")
-                ocr_engine_used = "PaddleOCR (CPU)"
                 print("OCR initialized (PaddleOCR - CPU mode, EasyOCR not available)")
             except ImportError:
                 print("Warning: OCR not available. Install EasyOCR for GPU acceleration or PaddleOCR for CPU.")
@@ -306,13 +308,11 @@ def process_video(
         # On non-Apple Silicon, try PaddleOCR first (can use CUDA GPU if available)
         try:
             ocr = PlateOCR(ocr_engine="paddleocr")
-            ocr_engine_used = "PaddleOCR"
             print("OCR initialized (PaddleOCR)")
         except ImportError:
             # Fallback to EasyOCR
             try:
                 ocr = PlateOCR(ocr_engine="easyocr")
-                ocr_engine_used = "EasyOCR"
                 print("OCR initialized (EasyOCR)")
             except ImportError:
                 print("Warning: OCR not available. Install PaddleOCR or EasyOCR for plate text extraction.")
@@ -357,7 +357,7 @@ def process_video(
                 output_video_path, fourcc, source_fps, (width, height)
             )
             if not video_writer.isOpened():
-                print(f"Warning: Could not open video writer with avc1, trying mp4v...")
+                print("Warning: Could not open video writer with avc1, trying mp4v...")
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 video_writer = cv2.VideoWriter(
                     output_video_path, fourcc, source_fps, (width, height)
@@ -375,6 +375,10 @@ def process_video(
         all_ocr_results = []  # Store all OCR outputs separately
         frame_count = 0
         track_id_counter = 0  # Fallback counter if tracker not available
+        
+        # Phase 1.3: Track separation - maintain track histories across frames
+        # Dictionary to store all detections by track_id for track history
+        track_histories: dict[int, list[Detection]] = {}
 
         # Create progress bar
         pbar = tqdm(
@@ -418,9 +422,31 @@ def process_video(
                         track_id_counter += 1
                         detection.track_id = track_id_counter
 
+            # Filter out pedestrians inside vehicles (spatial filtering)
+            detections = filter_pedestrians_in_vehicles(detections, overlap_threshold=0.7)
+
+            # Phase 1.3: Track separation - update track histories and separate tracks
+            # Update track histories with current frame detections
+            for detection in detections:
+                if detection.track_id is not None:
+                    if detection.track_id not in track_histories:
+                        track_histories[detection.track_id] = []
+                    track_histories[detection.track_id].append(detection)
+            
+            # Separate pedestrian and vehicle tracks (for Phase 4 risk scoring)
+            pedestrian_tracks = get_pedestrian_tracks(detections)
+            vehicle_tracks = get_vehicle_tracks(detections)
+            
+            # Validate track IDs are maintained correctly (optional check)
+            if frame_count % 100 == 0:  # Check every 100 frames to avoid overhead
+                is_valid = validate_track_ids(detections)
+                if not is_valid:
+                    print(f"Warning: Track ID validation failed at frame {frame_count}")
+
             # Update progress bar description with current stats
             pbar.set_description(
-                f"Processing frames (Frame {frame_count}, {len(detections)} detections)"
+                f"Processing frames (Frame {frame_count}, {len(detections)} detections, "
+                f"{len(pedestrian_tracks)} ped tracks, {len(vehicle_tracks)} veh tracks)"
             )
 
             # Detect plates on vehicle ROIs (skip some frames for speed)
@@ -625,13 +651,38 @@ def process_video(
     if save_annotated:
         print(f"Annotated video saved to {os.path.join(output_dir, 'annotated_output.mp4')}")
 
-    print(f"\nProcessing complete!")
+    print("\nProcessing complete!")
     print(f"Total frames processed: {frame_count}")
     print(f"Total detections: {sum(len(r['detections']) for r in all_results)}")
     print(f"Total plates detected: {sum(len(r['plates']) for r in all_results)}")
     if all_ocr_results:
         total_ocr_detections = sum(len(frame_data["ocr_results"]) for frame_data in all_ocr_results)
         print(f"Total OCR results: {len(all_ocr_results)} frames, {total_ocr_detections} detections")
+    
+    # Phase 1.3: Print track separation statistics
+    if track_histories:
+        # Get final separated tracks from last frame detections
+        if all_results and len(all_results) > 0:
+            last_frame_detections = all_results[-1]['detections']
+            # Convert dict detections back to Detection objects for track separation
+            detection_objects = []
+            for d in last_frame_detections:
+                detection_objects.append(
+                    Detection(
+                        bbox=d['bbox'],
+                        class_id=d.get('class_id', 0),
+                        class_name=d['class_name'],
+                        confidence=d['confidence'],
+                        frame_id=d['frame_id'],
+                        track_id=d.get('track_id'),
+                    )
+                )
+            ped_tracks = get_pedestrian_tracks(detection_objects)
+            veh_tracks = get_vehicle_tracks(detection_objects)
+            print(f"\nPhase 1.3 Track Separation Statistics:")
+            print(f"  Pedestrian tracks: {len(ped_tracks)}")
+            print(f"  Vehicle tracks: {len(veh_tracks)}")
+            print(f"  Total unique track IDs across video: {len(track_histories)}")
 
 
 def main() -> None:

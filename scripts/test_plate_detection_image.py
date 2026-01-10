@@ -11,12 +11,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-import cv2
-import numpy as np
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
 
-from src.detect import YOLODetector
-from src.lpr.ocr import PlateOCR
-from src.lpr.plate_types import PlateResult
+from src.detect import YOLODetector  # noqa: E402
+from src.lpr.ocr import PlateOCR  # noqa: E402
 
 # Cache vehicle class names
 _VEHICLE_CLASSES = frozenset(["car", "truck", "bus", "motorcycle"])

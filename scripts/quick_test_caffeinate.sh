@@ -12,3 +12,5 @@ echo ""
 # Run quick test with caffeinate
 caffeinate -d -i -m -s -u python scripts/quick_test.py "$@"
 
+
+

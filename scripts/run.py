@@ -71,11 +71,9 @@ def main():
     
     # Determine activation script
     if sys.platform == "win32":
-        activate_script = venv_path / "Scripts" / "activate.bat"
         pip_cmd = venv_path / "Scripts" / "pip"
         python_venv = venv_path / "Scripts" / "python"
     else:
-        activate_script = venv_path / "bin" / "activate"
         pip_cmd = venv_path / "bin" / "pip"
         python_venv = venv_path / "bin" / "python"
     

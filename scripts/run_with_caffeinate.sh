@@ -20,3 +20,5 @@ echo ""
 # Run the detection script with caffeinate
 caffeinate -d -i -m -s -u python scripts/run_detection.py "$@"
 
+
+
