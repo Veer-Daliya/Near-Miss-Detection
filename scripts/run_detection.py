@@ -12,15 +12,15 @@ from typing import List, Optional
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-import cv2
-import numpy as np
-from tqdm import tqdm
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
+from tqdm import tqdm  # noqa: E402
 
-from src.detect import Detection, YOLODetector
-from src.ingest import VideoReader
-from src.lpr import PlateAggregator, PlateDetector, PlateOCR, PlateResult
-from src.track import ByteTracker
-from src.utils import draw_detections_with_labels
+from src.detect import Detection, YOLODetector  # noqa: E402
+from src.ingest import VideoReader  # noqa: E402
+from src.lpr import PlateAggregator, PlateDetector, PlateOCR, PlateResult  # noqa: E402
+from src.track import ByteTracker  # noqa: E402
+from src.utils import draw_detections_with_labels  # noqa: E402
 
 
 # Cache vehicle class names for faster filtering
@@ -128,7 +128,6 @@ def _get_raw_ocr_data(ocr, plate_image: np.ndarray, ocr_result) -> dict:
                     if isinstance(ocr_result_data, dict):
                         rec_texts = ocr_result_data.get('rec_texts', [])
                         rec_scores = ocr_result_data.get('rec_scores', [])
-                        rec_polys = ocr_result_data.get('rec_polys', [])
                         
                         # Store all candidates
                         for text, score in zip(rec_texts, rec_scores):
@@ -262,7 +261,7 @@ def process_video(
     if batch_size > 1 and detector.device in ["cuda", "mps"]:
         print(f"GPU batch processing enabled: batch_size={batch_size}")
     elif batch_size > 1:
-        print(f"Warning: Batch size > 1 specified but GPU not available. Using batch_size=1")
+        print("Warning: Batch size > 1 specified but GPU not available. Using batch_size=1")
         batch_size = 1
     
     # Initialize plate detector (requires PaddleOCR)
@@ -276,7 +275,6 @@ def process_video(
     # Initialize OCR (optional - may fail if not installed)
     # Auto-select best OCR engine for GPU acceleration
     ocr = None
-    ocr_engine_used = None
     
     # Detect if we're on Apple Silicon (MPS GPU available)
     is_apple_silicon = False
@@ -292,13 +290,11 @@ def process_video(
         # Try EasyOCR first (supports Apple Silicon GPU via PyTorch MPS)
         try:
             ocr = PlateOCR(ocr_engine="easyocr")
-            ocr_engine_used = "EasyOCR (GPU-accelerated)"
             print("OCR initialized (EasyOCR with Apple Silicon GPU)")
         except ImportError:
             # Fallback to PaddleOCR (CPU only on macOS)
             try:
                 ocr = PlateOCR(ocr_engine="paddleocr")
-                ocr_engine_used = "PaddleOCR (CPU)"
                 print("OCR initialized (PaddleOCR - CPU mode, EasyOCR not available)")
             except ImportError:
                 print("Warning: OCR not available. Install EasyOCR for GPU acceleration or PaddleOCR for CPU.")
@@ -306,13 +302,11 @@ def process_video(
         # On non-Apple Silicon, try PaddleOCR first (can use CUDA GPU if available)
         try:
             ocr = PlateOCR(ocr_engine="paddleocr")
-            ocr_engine_used = "PaddleOCR"
             print("OCR initialized (PaddleOCR)")
         except ImportError:
             # Fallback to EasyOCR
             try:
                 ocr = PlateOCR(ocr_engine="easyocr")
-                ocr_engine_used = "EasyOCR"
                 print("OCR initialized (EasyOCR)")
             except ImportError:
                 print("Warning: OCR not available. Install PaddleOCR or EasyOCR for plate text extraction.")
@@ -357,7 +351,7 @@ def process_video(
                 output_video_path, fourcc, source_fps, (width, height)
             )
             if not video_writer.isOpened():
-                print(f"Warning: Could not open video writer with avc1, trying mp4v...")
+                print("Warning: Could not open video writer with avc1, trying mp4v...")
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 video_writer = cv2.VideoWriter(
                     output_video_path, fourcc, source_fps, (width, height)
@@ -625,7 +619,7 @@ def process_video(
     if save_annotated:
         print(f"Annotated video saved to {os.path.join(output_dir, 'annotated_output.mp4')}")
 
-    print(f"\nProcessing complete!")
+    print("\nProcessing complete!")
     print(f"Total frames processed: {frame_count}")
     print(f"Total detections: {sum(len(r['detections']) for r in all_results)}")
     print(f"Total plates detected: {sum(len(r['plates']) for r in all_results)}")

@@ -193,3 +193,5 @@ class PlateAggregator:
         return len(self.plate_history.get(vehicle_track_id, []))
 
 
+
+

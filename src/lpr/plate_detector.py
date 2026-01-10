@@ -62,7 +62,7 @@ class PlateDetector:
                     gpu_available = True
                     # Also set environment variable for PaddleOCR
                     os.environ["USE_GPU"] = "1"
-                except Exception as e:
+                except Exception:
                     # GPU not available or error setting device
                     paddle.device.set_device("cpu")
                     gpu_available = False
@@ -70,7 +70,7 @@ class PlateDetector:
                 # Check if we can use CPU with optimizations
                 paddle.device.set_device("cpu")
                 gpu_available = False
-        except (ImportError, AttributeError) as e:
+        except (ImportError, AttributeError):
             # PaddlePaddle not available or error
             gpu_available = False
         
@@ -143,11 +143,10 @@ class PlateDetector:
                 
                 # Handle different line formats
                 if isinstance(line, tuple) and len(line) == 2:
-                    bbox_points, (text, confidence) = line
+                    bbox_points, (_, confidence) = line
                 elif isinstance(line, dict):
                     # New format might be dict
                     bbox_points = line.get('bbox', [])
-                    text = line.get('text', '')
                     confidence = line.get('confidence', 0.0)
                 else:
                     continue
