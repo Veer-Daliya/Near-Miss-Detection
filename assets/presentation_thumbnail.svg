@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <!-- Background (slide-like) -->
+  <rect width="400" height="300" fill="#1a1a2e" stroke="#16213e" stroke-width="3"/>
+
+  <!-- Top accent bar -->
+  <rect y="0" width="400" height="8" fill="#e94560"/>
+
+  <!-- Presentation icon -->
+  <g transform="translate(165, 40)">
+    <rect x="0" y="0" width="70" height="50" fill="#0f3460" rx="5" stroke="#e94560" stroke-width="2"/>
+    <circle cx="35" cy="25" r="12" fill="#e94560"/>
+    <polygon points="31,20 31,30 42,25" fill="#1a1a2e"/>
+  </g>
+
+  <!-- Title -->
+  <text x="200" y="120" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff">
+    Technical Presentation
+  </text>
+
+  <!-- Subtitle -->
+  <text x="200" y="148" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#a0a0a0">
+    Near-Miss Detection System
+  </text>
+
+  <!-- Divider -->
+  <line x1="120" y1="165" x2="280" y2="165" stroke="#e94560" stroke-width="2"/>
+
+  <!-- Details -->
+  <g font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#cccccc">
+    <text x="200" y="190" text-anchor="middle">15-Minute Presentation</text>
+    <text x="200" y="208" text-anchor="middle">Speaker Notes Included</text>
+    <text x="200" y="226" text-anchor="middle">Beamer LaTeX Format</text>
+  </g>
+
+  <!-- Download button -->
+  <g transform="translate(150, 245)">
+    <rect x="0" y="0" width="100" height="30" fill="#e94560" rx="15"/>
+    <text x="50" y="20" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#ffffff" font-weight="bold">
+      Download
+    </text>
+  </g>
+
+  <!-- Slide count indicator -->
+  <g transform="translate(350, 270)">
+    <text text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="9" fill="#666666">
+      16 slides
+    </text>
+  </g>
+</svg>

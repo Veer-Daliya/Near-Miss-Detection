@@ -741,7 +741,7 @@ def process_video(
                         class_id=d.get('class_id', 0),
                         class_name=d['class_name'],
                         confidence=d['confidence'],
-                        frame_id=d['frame_id'],
+                        frame_id=all_results[-1]['frame_id'],
                         track_id=d.get('track_id'),
                     )
                 )
