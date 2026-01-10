@@ -20,6 +20,31 @@ A computer vision pipeline for detecting pedestrian–vehicle collision risk, co
 
 ---
 
+## Feature Status
+
+| Feature | Status | Module |
+|---------|--------|--------|
+| Object Detection (YOLO) | Implemented | `src/detect/` |
+| Multi-Object Tracking (ByteTrack) | Implemented | `src/track/` |
+| Pedestrian-in-Vehicle Filtering | Implemented | `src/filter/` |
+| License Plate Detection | Implemented | `src/lpr/plate_detector.py` |
+| License Plate OCR | Implemented | `src/lpr/ocr.py` |
+| Multi-Frame Plate Aggregation | Implemented | `src/lpr/aggregator.py` |
+| Ground Plane Estimation | Implemented | `src/ground_plane/` |
+| Near-Miss Detection (TTC) | Implemented | `src/risk/` |
+| Trajectory Tracking | Implemented | `src/risk/trajectory.py` |
+| Collision Prediction | Implemented | `src/risk/collision_predictor.py` |
+| Impact Detection | Planned | - |
+| VLM Escalation | Planned | - |
+
+### Quick Start with Near-Miss Detection
+
+```bash
+python scripts/run_detection.py --source video.mp4 --enable-near-miss
+```
+
+---
+
 ## Problem Statement
 
 This system addresses three core objectives:

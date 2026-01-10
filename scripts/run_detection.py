@@ -18,8 +18,10 @@ from tqdm import tqdm  # noqa: E402
 
 from src.detect import Detection, YOLODetector  # noqa: E402
 from src.filter import filter_pedestrians_in_vehicles  # noqa: E402
+from src.ground_plane import GroundPlaneEstimator  # noqa: E402
 from src.ingest import VideoReader  # noqa: E402
 from src.lpr import PlateAggregator, PlateDetector, PlateOCR, PlateResult  # noqa: E402
+from src.risk import NearMissDetector, CollisionRisk  # noqa: E402
 from src.track import (
     ByteTracker,
     get_pedestrian_tracks,
@@ -241,6 +243,7 @@ def process_video(
     plate_detection_interval: int = 1,  # Process plates on every frame
     use_aggregation: bool = True,  # Use multi-frame aggregation
     batch_size: int = 1,  # Batch size for GPU processing (1 = no batching)
+    enable_near_miss: bool = False,  # Enable near-miss detection
 ) -> None:
     """
     Process video and run detection pipeline.
@@ -323,6 +326,14 @@ def process_video(
         aggregator = PlateAggregator(min_confidence=0.3, min_agreement=0.5)
         print("Multi-frame aggregation enabled")
 
+    # Initialize near-miss detection modules
+    ground_plane_estimator = None
+    near_miss_detector = None
+    if enable_near_miss:
+        ground_plane_estimator = GroundPlaneEstimator()
+        near_miss_detector = NearMissDetector()
+        print("Near-miss detection enabled (ground plane + collision prediction)")
+
     # Open video
     print(f"Opening video source: {source}")
     with VideoReader(source, fps=fps) as reader:
@@ -373,6 +384,7 @@ def process_video(
         # Process frames
         all_results = []
         all_ocr_results = []  # Store all OCR outputs separately
+        all_near_miss_events = []  # Store all near-miss events
         frame_count = 0
         track_id_counter = 0  # Fallback counter if tracker not available
         
@@ -443,10 +455,45 @@ def process_video(
                 if not is_valid:
                     print(f"Warning: Track ID validation failed at frame {frame_count}")
 
+            # Near-miss detection (if enabled)
+            frame_near_miss_events = []
+            if near_miss_detector and ground_plane_estimator:
+                # Update ground plane estimate
+                ground_plane_estimator.estimate(frame)
+
+                # Convert detections to dict format for near-miss detector
+                detection_dicts = [
+                    {
+                        "track_id": d.track_id,
+                        "bbox": d.bbox,
+                        "class_name": d.class_name,
+                    }
+                    for d in detections
+                ]
+
+                # Process frame for near-miss events
+                frame_near_miss_events = near_miss_detector.process_frame(
+                    frame_id, detection_dicts, ground_plane_estimator
+                )
+
+                # Store critical/warning events
+                for event in frame_near_miss_events:
+                    if event.risk_level in ("critical", "warning"):
+                        all_near_miss_events.append({
+                            "frame_id": frame_id,
+                            "timestamp": timestamp,
+                            "pedestrian_track_id": event.pedestrian_track_id,
+                            "vehicle_track_id": event.vehicle_track_id,
+                            "ttc": event.ttc,
+                            "min_distance": event.min_distance,
+                            "risk_level": event.risk_level,
+                        })
+
             # Update progress bar description with current stats
+            near_miss_count = len([e for e in frame_near_miss_events if e.risk_level == "critical"])
             pbar.set_description(
-                f"Processing frames (Frame {frame_count}, {len(detections)} detections, "
-                f"{len(pedestrian_tracks)} ped tracks, {len(vehicle_tracks)} veh tracks)"
+                f"Processing frames (Frame {frame_count}, {len(detections)} det, "
+                f"{len(pedestrian_tracks)} ped, {len(vehicle_tracks)} veh, {near_miss_count} risk)"
             )
 
             # Detect plates on vehicle ROIs (skip some frames for speed)
@@ -620,6 +667,16 @@ def process_video(
                     }
                     for p in json_plate_results
                 ],
+                "near_miss_events": [
+                    {
+                        "pedestrian_track_id": e.pedestrian_track_id,
+                        "vehicle_track_id": e.vehicle_track_id,
+                        "ttc": e.ttc,
+                        "min_distance": e.min_distance,
+                        "risk_level": e.risk_level,
+                    }
+                    for e in frame_near_miss_events
+                ] if frame_near_miss_events else [],
             }
             all_results.append(frame_result)
 
@@ -651,6 +708,13 @@ def process_video(
     if save_annotated:
         print(f"Annotated video saved to {os.path.join(output_dir, 'annotated_output.mp4')}")
 
+    # Save near-miss events summary
+    if enable_near_miss and all_near_miss_events:
+        near_miss_path = os.path.join(output_dir, "near_miss_events.json")
+        with open(near_miss_path, "w") as f:
+            json.dump(all_near_miss_events, f, indent=2)
+        print(f"Near-miss events saved to {near_miss_path}")
+
     print("\nProcessing complete!")
     print(f"Total frames processed: {frame_count}")
     print(f"Total detections: {sum(len(r['detections']) for r in all_results)}")
@@ -658,6 +722,10 @@ def process_video(
     if all_ocr_results:
         total_ocr_detections = sum(len(frame_data["ocr_results"]) for frame_data in all_ocr_results)
         print(f"Total OCR results: {len(all_ocr_results)} frames, {total_ocr_detections} detections")
+    if enable_near_miss:
+        critical_count = len([e for e in all_near_miss_events if e["risk_level"] == "critical"])
+        warning_count = len([e for e in all_near_miss_events if e["risk_level"] == "warning"])
+        print(f"Near-miss events: {critical_count} critical, {warning_count} warning")
     
     # Phase 1.3: Print track separation statistics
     if track_histories:
@@ -749,6 +817,12 @@ def main() -> None:
         dest="batch_size",
         help="Batch size for GPU processing (1-8, higher = faster but uses more GPU memory). Only effective with GPU.",
     )
+    parser.add_argument(
+        "--enable-near-miss",
+        action="store_true",
+        dest="enable_near_miss",
+        help="Enable near-miss detection with ground plane estimation and collision prediction.",
+    )
 
     args = parser.parse_args()
 
@@ -768,6 +842,7 @@ def main() -> None:
         plate_detection_interval=args.plate_interval,
         use_aggregation=not args.no_aggregation,
         batch_size=batch_size,
+        enable_near_miss=args.enable_near_miss,
     )
 
 
