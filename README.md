@@ -57,12 +57,6 @@
 
 </div>
 
-The paper presents our complete methodology including:
-- Multi-method ground plane estimation cascade
-- Closest Point of Approach (CPA) algorithm adaptation
-- Multi-frame OCR aggregation for license plate recognition
-- Comprehensive experimental evaluation
-
 ---
 
 ## Presentation
@@ -78,6 +72,55 @@ The paper presents our complete methodology including:
 *15-minute technical presentation with speaker notes*
 
 </div>
+
+---
+
+## Modes
+
+The system supports several operation modes depending on your use case:
+
+### Detection Only Mode
+Basic object detection and tracking without collision analysis. Fastest mode for general surveillance.
+
+```bash
+python scripts/run_detection.py --source video.mp4
+```
+
+### Near-Miss Detection Mode
+Full collision risk analysis with physics-based prediction. Enables ground plane estimation and CPA algorithm.
+
+```bash
+python scripts/run_detection.py --source video.mp4 --enable-near-miss
+```
+
+### License Plate Recognition Mode
+Detection with license plate extraction and multi-frame OCR aggregation (enabled by default).
+
+```bash
+python scripts/run_detection.py --source video.mp4 --plate-interval 1
+```
+
+### Full Analysis Mode
+All features enabled: detection, tracking, near-miss prediction, and license plate recognition.
+
+```bash
+python scripts/run_detection.py \
+  --source video.mp4 \
+  --enable-near-miss \
+  --plate-interval 1 \
+  --model-size l
+```
+
+### Lightweight Mode
+Optimized for speed with minimal output. Good for real-time streams.
+
+```bash
+python scripts/run_detection.py \
+  --source rtsp://camera-ip/stream \
+  --model-size n \
+  --no-json \
+  --plate-interval 5
+```
 
 ---
 
