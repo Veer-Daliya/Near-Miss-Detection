@@ -9,7 +9,7 @@
 
 **What to say:**
 
-"Good morning/afternoon. My name is Veer Jhaveri, and today I'm excited to present my research on real-time pedestrian-vehicle collision risk assessment.
+"Good morning/afternoon. My name is Veer Daliya, and today I'm excited to present my research on real-time pedestrian-vehicle collision risk assessment.
 
 This project combines state-of-the-art deep learning with classical physics to create a system that can actually predict when a pedestrian and vehicle might collide—before it happens.
 

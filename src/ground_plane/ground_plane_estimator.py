@@ -595,11 +595,7 @@ class GroundPlaneEstimator:
         estimate = self._cached_estimate
         x_img, y_img = image_point
 
-        # Cannot project points above or on the horizon
-        if estimate.horizon_y is not None and y_img <= estimate.horizon_y:
-            return None
-
-        # Method 1: Use homography if available
+        # Method 1: Use homography if available (works for any camera angle)
         if estimate.homography is not None:
             try:
                 # Apply homography
@@ -617,20 +613,15 @@ class GroundPlaneEstimator:
             except cv2.error:
                 pass
 
-        # Method 2: Simple geometric projection
-        if estimate.horizon_y is not None:
-            horizon_y = estimate.horizon_y
-            # Distance is inversely proportional to how far below horizon
-            pixels_below_horizon = y_img - horizon_y
-            if pixels_below_horizon <= 0:
-                return None
+        # Method 2: Size-based fallback using vertical position
+        # Objects lower in the image are closer to camera
+        if self._image_height > 0:
+            # Normalize y position (0 = top, 1 = bottom)
+            y_normalized = y_img / self._image_height
 
-            # Use similar triangles
-            z_meters = (
-                self.camera_height
-                * self.focal_length
-                / pixels_below_horizon
-            )
+            # Map to distance: objects at bottom are ~2m, at top are ~50m
+            # Using exponential mapping for more realistic distances
+            z_meters = 2.0 + (1.0 - y_normalized) * 30.0
 
             # Lateral position based on x offset from center
             x_offset = x_img - self._image_width / 2

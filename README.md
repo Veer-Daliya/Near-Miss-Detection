@@ -374,7 +374,7 @@ If you use this work in your research, please cite:
 @article{kent2024nearmiss,
   title={Real-Time Pedestrian-Vehicle Collision Risk Assessment Using
          Physics-Based Trajectory Analysis and Multi-Modal Computer Vision},
-  author={Jhaveri, Veer},
+  author={Daliya, Veer},
   year={2024},
   institution={Inspirit AI}
 }
