@@ -17,9 +17,15 @@ import numpy as np  # noqa: E402
 from tqdm import tqdm  # noqa: E402
 
 from src.detect import Detection, YOLODetector  # noqa: E402
+from src.filter import filter_pedestrians_in_vehicles  # noqa: E402
 from src.ingest import VideoReader  # noqa: E402
 from src.lpr import PlateAggregator, PlateDetector, PlateOCR, PlateResult  # noqa: E402
-from src.track import ByteTracker  # noqa: E402
+from src.track import (
+    ByteTracker,
+    get_pedestrian_tracks,
+    get_vehicle_tracks,
+    validate_track_ids,
+)  # noqa: E402
 from src.utils import draw_detections_with_labels  # noqa: E402
 
 
@@ -369,6 +375,10 @@ def process_video(
         all_ocr_results = []  # Store all OCR outputs separately
         frame_count = 0
         track_id_counter = 0  # Fallback counter if tracker not available
+        
+        # Phase 1.3: Track separation - maintain track histories across frames
+        # Dictionary to store all detections by track_id for track history
+        track_histories: dict[int, list[Detection]] = {}
 
         # Create progress bar
         pbar = tqdm(
@@ -412,9 +422,31 @@ def process_video(
                         track_id_counter += 1
                         detection.track_id = track_id_counter
 
+            # Filter out pedestrians inside vehicles (spatial filtering)
+            detections = filter_pedestrians_in_vehicles(detections, overlap_threshold=0.7)
+
+            # Phase 1.3: Track separation - update track histories and separate tracks
+            # Update track histories with current frame detections
+            for detection in detections:
+                if detection.track_id is not None:
+                    if detection.track_id not in track_histories:
+                        track_histories[detection.track_id] = []
+                    track_histories[detection.track_id].append(detection)
+            
+            # Separate pedestrian and vehicle tracks (for Phase 4 risk scoring)
+            pedestrian_tracks = get_pedestrian_tracks(detections)
+            vehicle_tracks = get_vehicle_tracks(detections)
+            
+            # Validate track IDs are maintained correctly (optional check)
+            if frame_count % 100 == 0:  # Check every 100 frames to avoid overhead
+                is_valid = validate_track_ids(detections)
+                if not is_valid:
+                    print(f"Warning: Track ID validation failed at frame {frame_count}")
+
             # Update progress bar description with current stats
             pbar.set_description(
-                f"Processing frames (Frame {frame_count}, {len(detections)} detections)"
+                f"Processing frames (Frame {frame_count}, {len(detections)} detections, "
+                f"{len(pedestrian_tracks)} ped tracks, {len(vehicle_tracks)} veh tracks)"
             )
 
             # Detect plates on vehicle ROIs (skip some frames for speed)
@@ -626,6 +658,31 @@ def process_video(
     if all_ocr_results:
         total_ocr_detections = sum(len(frame_data["ocr_results"]) for frame_data in all_ocr_results)
         print(f"Total OCR results: {len(all_ocr_results)} frames, {total_ocr_detections} detections")
+    
+    # Phase 1.3: Print track separation statistics
+    if track_histories:
+        # Get final separated tracks from last frame detections
+        if all_results and len(all_results) > 0:
+            last_frame_detections = all_results[-1]['detections']
+            # Convert dict detections back to Detection objects for track separation
+            detection_objects = []
+            for d in last_frame_detections:
+                detection_objects.append(
+                    Detection(
+                        bbox=d['bbox'],
+                        class_id=d.get('class_id', 0),
+                        class_name=d['class_name'],
+                        confidence=d['confidence'],
+                        frame_id=d['frame_id'],
+                        track_id=d.get('track_id'),
+                    )
+                )
+            ped_tracks = get_pedestrian_tracks(detection_objects)
+            veh_tracks = get_vehicle_tracks(detection_objects)
+            print(f"\nPhase 1.3 Track Separation Statistics:")
+            print(f"  Pedestrian tracks: {len(ped_tracks)}")
+            print(f"  Vehicle tracks: {len(veh_tracks)}")
+            print(f"  Total unique track IDs across video: {len(track_histories)}")
 
 
 def main() -> None:
