@@ -48,7 +48,7 @@
 <div align="center">
 
 <a href="https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/paper/near_miss_detection.pdf">
-<img src="assets/paper_thumbnail.svg" alt="Research Paper" width="300"/>
+<img src="assets/paper_thumbnail.png" alt="Research Paper" width="300"/>
 </a>
 
 **[Download Paper (PDF)](https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/paper/near_miss_detection.pdf)**
@@ -64,7 +64,7 @@
 <div align="center">
 
 <a href="https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/presentation/near_miss_presentation.pdf">
-<img src="assets/presentation_thumbnail.svg" alt="Presentation" width="300"/>
+<img src="assets/presentation_thumbnail.png" alt="Presentation" width="300"/>
 </a>
 
 **[Download Presentation (PDF)](https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/presentation/near_miss_presentation.pdf)**
