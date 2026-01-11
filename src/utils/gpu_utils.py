@@ -6,13 +6,14 @@ from typing import Optional
 def clear_gpu_cache(device: Optional[str] = None) -> None:
     """
     Clear GPU cache to free up memory.
-    
+
     Args:
         device: Device to clear cache for ('cuda', 'mps', or None for auto-detect)
     """
     if device is None:
         try:
             import torch
+
             if torch.cuda.is_available():
                 device = "cuda"
             elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -21,10 +22,11 @@ def clear_gpu_cache(device: Optional[str] = None) -> None:
                 return  # No GPU available
         except ImportError:
             return
-    
+
     if device == "cuda":
         try:
             import torch
+
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
@@ -33,6 +35,7 @@ def clear_gpu_cache(device: Optional[str] = None) -> None:
     elif device == "mps":
         try:
             import torch
+
             if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 torch.mps.empty_cache()
         except Exception:
@@ -42,16 +45,17 @@ def clear_gpu_cache(device: Optional[str] = None) -> None:
 def get_gpu_memory_info(device: Optional[str] = None) -> Optional[dict]:
     """
     Get GPU memory information.
-    
+
     Args:
         device: Device to check ('cuda', 'mps', or None for auto-detect)
-    
+
     Returns:
         Dictionary with memory info or None if GPU not available
     """
     if device is None:
         try:
             import torch
+
             if torch.cuda.is_available():
                 device = "cuda"
             elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -60,10 +64,11 @@ def get_gpu_memory_info(device: Optional[str] = None) -> Optional[dict]:
                 return None
         except ImportError:
             return None
-    
+
     if device == "cuda":
         try:
             import torch
+
             if torch.cuda.is_available():
                 allocated = torch.cuda.memory_allocated(0) / 1024**3  # GB
                 reserved = torch.cuda.memory_reserved(0) / 1024**3  # GB
@@ -79,20 +84,21 @@ def get_gpu_memory_info(device: Optional[str] = None) -> Optional[dict]:
     elif device == "mps":
         # MPS doesn't have detailed memory info API yet
         return {"device": "mps", "note": "Memory info not available for MPS"}
-    
+
     return None
 
 
 def optimize_gpu_settings(device: Optional[str] = None) -> None:
     """
     Optimize GPU settings for better performance.
-    
+
     Args:
         device: Device to optimize ('cuda', 'mps', or None for auto-detect)
     """
     if device is None:
         try:
             import torch
+
             if torch.cuda.is_available():
                 device = "cuda"
             elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -101,10 +107,11 @@ def optimize_gpu_settings(device: Optional[str] = None) -> None:
                 return
         except ImportError:
             return
-    
+
     if device == "cuda":
         try:
             import torch
+
             if torch.cuda.is_available():
                 # Enable cuDNN benchmarking for consistent input sizes (faster)
                 torch.backends.cudnn.benchmark = True
@@ -115,7 +122,3 @@ def optimize_gpu_settings(device: Optional[str] = None) -> None:
                 torch.backends.cudnn.allow_tf32 = True
         except Exception:
             pass
-
-
-
-

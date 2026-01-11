@@ -3,8 +3,6 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
-
 
 class TrajectoryTracker:
     """Tracks object trajectories and estimates velocities.
@@ -95,9 +93,7 @@ class TrajectoryTracker:
         """
         return self._smoothed_velocity.get(track_id)
 
-    def get_position_history(
-        self, track_id: int
-    ) -> List[Tuple[float, float]]:
+    def get_position_history(self, track_id: int) -> List[Tuple[float, float]]:
         """Get the position history for a track.
 
         Args:

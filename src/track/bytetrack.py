@@ -11,7 +11,7 @@ from src.detect.detection_types import Detection
 class ByteTracker:
     """
     ByteTrack multi-object tracker using YOLO's built-in tracking.
-    
+
     Provides stable track IDs across frames using ByteTrack algorithm.
     """
 
@@ -37,10 +37,12 @@ class ByteTracker:
         self.match_thresh = match_thresh
         self.frame_count = 0  # Track frame count for persist
 
-    def update(self, detections: List[Detection], frame: np.ndarray, frame_id: int = 0) -> List[Detection]:
+    def update(
+        self, detections: List[Detection], frame: np.ndarray, frame_id: int = 0
+    ) -> List[Detection]:
         """
         Update tracker and return detections with track IDs.
-        
+
         IMPORTANT: This uses YOLO's track() which does detection AND tracking in one pass.
         This ensures bboxes and track IDs correspond correctly from the same detection.
 
@@ -53,7 +55,7 @@ class ByteTracker:
             List of detections with track IDs assigned (bboxes and IDs from same detection pass)
         """
         self.frame_count += 1
-        
+
         # Use YOLO's built-in tracking (ByteTrack is default)
         # persist=True maintains track IDs across frames
         # This does BOTH detection AND tracking in one pass, ensuring bboxes match track IDs
@@ -61,15 +63,16 @@ class ByteTracker:
         device = None
         try:
             import torch
+
             if torch.cuda.is_available():
                 device = "cuda"
             elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
                 device = "mps"
         except ImportError:
             pass
-        
+
         half = device in ["cuda", "mps"] if device else False
-        
+
         results = self.model.track(
             frame,
             conf=self.track_thresh,
@@ -84,7 +87,7 @@ class ByteTracker:
         # Extract tracked detections directly from YOLO tracking results
         # This ensures bboxes and track IDs come from the same detection pass
         tracked_detections = []
-        
+
         # Map class IDs to class names (from YOLODetector)
         COCO_CLASSES = {
             0: "person",
@@ -97,25 +100,34 @@ class ByteTracker:
         for result in results:
             if result.boxes is not None:
                 boxes = result.boxes
-                
+
                 # Get track IDs (may be None if tracking not available)
                 track_ids = None
                 if boxes.id is not None:
-                    track_ids = boxes.id.cpu().numpy().astype(int)
-                
+                    box_ids = boxes.id
+                    # Handle both Tensor and ndarray
+                    if hasattr(box_ids, "cpu"):
+                        track_ids = box_ids.cpu().numpy().astype(int)
+                    else:
+                        track_ids = box_ids.astype(int)  # type: ignore[union-attr]
+
                 for i in range(len(boxes)):
                     # Get bbox from tracked results (ensures consistency)
                     x1, y1, x2, y2 = boxes.xyxy[i].cpu().numpy()
                     class_id = int(boxes.cls[i])
                     confidence = float(boxes.conf[i])
-                    
+
                     # Only process classes we care about
                     if class_id not in COCO_CLASSES:
                         continue
-                    
+
                     # Get track ID (if available)
-                    track_id = int(track_ids[i]) if track_ids is not None and i < len(track_ids) else None
-                    
+                    track_id = (
+                        int(track_ids[i])
+                        if track_ids is not None and i < len(track_ids)
+                        else None
+                    )
+
                     tracked_det = Detection(
                         bbox=[int(x1), int(y1), int(x2), int(y2)],
                         class_id=class_id,
@@ -169,4 +181,3 @@ class ByteTracker:
         union = area1 + area2 - intersection
 
         return intersection / union if union > 0 else 0.0
-

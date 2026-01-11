@@ -8,8 +8,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.detect.detection_types import Detection
-from src.track import (
+from src.detect.detection_types import Detection  # noqa: E402
+from src.track import (  # noqa: E402
     filter_tracks_by_class,
     get_pedestrian_tracks,
     get_vehicle_tracks,
@@ -24,7 +24,7 @@ def test_track_separation():
     print("=" * 60)
     print("Testing Track Separation Functions")
     print("=" * 60)
-    
+
     # Create sample detections with track IDs
     detections = [
         # Pedestrian track 1 (frame 0)
@@ -82,11 +82,11 @@ def test_track_separation():
             track_id=4,
         ),
     ]
-    
+
     print(f"\nTotal detections: {len(detections)}")
     print(f"Frames: {set(d.frame_id for d in detections)}")
     print(f"Track IDs: {set(d.track_id for d in detections if d.track_id is not None)}")
-    
+
     # Test 1: Group by track ID
     print("\n" + "-" * 60)
     print("Test 1: Group detections by track ID")
@@ -95,7 +95,7 @@ def test_track_separation():
     print(f"Found {len(tracks)} tracks:")
     for track_id, track_detections in tracks.items():
         print(f"  Track {track_id}: {len(track_detections)} detections")
-    
+
     # Test 2: Separate pedestrian and vehicle tracks
     print("\n" + "-" * 60)
     print("Test 2: Separate pedestrian and vehicle tracks")
@@ -104,11 +104,11 @@ def test_track_separation():
     print(f"Pedestrian tracks: {len(ped_tracks)}")
     for track_id, track_detections in ped_tracks.items():
         print(f"  Track {track_id}: {len(track_detections)} detections")
-    
+
     print(f"\nVehicle tracks: {len(veh_tracks)}")
     for track_id, track_detections in veh_tracks.items():
         print(f"  Track {track_id}: {len(track_detections)} detections")
-    
+
     # Test 3: Get pedestrian tracks (convenience function)
     print("\n" + "-" * 60)
     print("Test 3: Get pedestrian tracks (convenience function)")
@@ -117,7 +117,7 @@ def test_track_separation():
     print(f"Found {len(ped_tracks_2)} pedestrian tracks")
     assert len(ped_tracks_2) == len(ped_tracks), "Pedestrian track counts should match"
     print("✓ Pedestrian track counts match")
-    
+
     # Test 4: Get vehicle tracks (convenience function)
     print("\n" + "-" * 60)
     print("Test 4: Get vehicle tracks (convenience function)")
@@ -126,7 +126,7 @@ def test_track_separation():
     print(f"Found {len(veh_tracks_2)} vehicle tracks")
     assert len(veh_tracks_2) == len(veh_tracks), "Vehicle track counts should match"
     print("✓ Vehicle track counts match")
-    
+
     # Test 5: Filter tracks by class
     print("\n" + "-" * 60)
     print("Test 5: Filter tracks by class")
@@ -136,12 +136,12 @@ def test_track_separation():
     print(f"Car tracks: {len(car_tracks)}")
     for track_id in car_tracks:
         print(f"  Track {track_id}")
-    
+
     person_tracks = filter_tracks_by_class(all_tracks, "person")
     print(f"\nPerson tracks: {len(person_tracks)}")
     for track_id in person_tracks:
         print(f"  Track {track_id}")
-    
+
     # Test 6: Validate track IDs
     print("\n" + "-" * 60)
     print("Test 6: Validate track IDs")
@@ -150,7 +150,7 @@ def test_track_separation():
     print(f"Track IDs are valid: {is_valid}")
     assert is_valid, "Track IDs should be valid"
     print("✓ Track IDs are valid")
-    
+
     # Test 7: Test with invalid track (same track_id, different classes)
     print("\n" + "-" * 60)
     print("Test 7: Test validation with invalid track")
@@ -171,7 +171,7 @@ def test_track_separation():
     print(f"Invalid track IDs validation: {is_valid_invalid}")
     assert not is_valid_invalid, "Invalid track IDs should fail validation"
     print("✓ Invalid track IDs correctly detected")
-    
+
     print("\n" + "=" * 60)
     print("ALL TESTS PASSED ✓")
     print("=" * 60)
@@ -187,4 +187,3 @@ def test_track_separation():
 
 if __name__ == "__main__":
     test_track_separation()
-

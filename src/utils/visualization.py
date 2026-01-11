@@ -31,7 +31,9 @@ def draw_detections_with_labels(
     annotated = frame.copy()
 
     # Pre-compute plate lookup for faster access (O(1) instead of O(n) per vehicle)
-    plate_lookup = {p.vehicle_track_id: p for p in plate_results if p.vehicle_track_id is not None}
+    plate_lookup = {
+        p.vehicle_track_id: p for p in plate_results if p.vehicle_track_id is not None
+    }
 
     for detection in detections:
         bbox = detection.bbox
@@ -110,4 +112,3 @@ def draw_detections_with_labels(
         )
 
     return annotated
-

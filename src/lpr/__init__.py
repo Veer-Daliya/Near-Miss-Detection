@@ -6,5 +6,3 @@ from src.lpr.plate_detector import PlateDetector
 from src.lpr.plate_types import PlateResult
 
 __all__ = ["PlateDetector", "PlateResult", "PlateOCR", "PlateAggregator"]
-
-

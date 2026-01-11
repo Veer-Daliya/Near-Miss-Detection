@@ -1,7 +1,7 @@
 """Road marking detection using Canny edge detection and Hough Transform."""
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import cv2
 import numpy as np
@@ -33,7 +33,7 @@ class LineGroup:
 
     def get_representative_line(self) -> Line:
         """Get the longest line as representative of the group."""
-        return max(self.lines, key=lambda l: l.length)
+        return max(self.lines, key=lambda line: line.length)
 
 
 class LineDetector:
@@ -221,8 +221,8 @@ class LineDetector:
                     used[j] = True
 
             # Calculate average angle and length for the group
-            avg_angle = np.mean([l.angle for l in group_lines])
-            avg_length = np.mean([l.length for l in group_lines])
+            avg_angle = float(np.mean([line.angle for line in group_lines]))
+            avg_length = float(np.mean([line.length for line in group_lines]))
 
             groups.append(LineGroup(group_lines, avg_angle, avg_length))
 
@@ -240,13 +240,15 @@ class LineDetector:
         """
         all_lines = self.detect_lines(image)
         horizontal_lines = self.filter_horizontal_lines(all_lines)
-        
+
         if self.temporal_smoothing and self.prev_lane_lines:
-            horizontal_lines = self._smooth_lines(horizontal_lines, self.prev_lane_lines)
-        
+            horizontal_lines = self._smooth_lines(
+                horizontal_lines, self.prev_lane_lines
+            )
+
         if self.temporal_smoothing:
             self.prev_lane_lines = horizontal_lines
-        
+
         return horizontal_lines
 
     def detect_road_edges(self, image: np.ndarray) -> List[Line]:
@@ -261,104 +263,125 @@ class LineDetector:
         """
         all_lines = self.detect_lines(image)
         vertical_lines = self.filter_vertical_lines(all_lines)
-        
+
         if self.temporal_smoothing and self.prev_road_edges:
             vertical_lines = self._smooth_lines(vertical_lines, self.prev_road_edges)
-        
+
         if self.temporal_smoothing:
             self.prev_road_edges = vertical_lines
-        
+
         return vertical_lines
-    
-    def _smooth_lines(self, current_lines: List[Line], previous_lines: List[Line]) -> List[Line]:
+
+    def _smooth_lines(
+        self, current_lines: List[Line], previous_lines: List[Line]
+    ) -> List[Line]:
         """
         Smooth lines temporally by matching and averaging with previous frame's lines.
-        
+
         Args:
             current_lines: Lines detected in current frame
             previous_lines: Lines from previous frame
-            
+
         Returns:
             Smoothed lines
         """
         if not previous_lines:
             return current_lines
-        
+
         if not current_lines:
             return previous_lines
-        
+
         # Match current lines to previous lines based on position and angle
         matched_lines: List[Line] = []
         used_prev = [False] * len(previous_lines)
-        
+
         for curr_line in current_lines:
             best_match_idx = -1
-            best_distance = float('inf')
-            
+            best_distance = float("inf")
+
             # Find closest matching previous line
             for i, prev_line in enumerate(previous_lines):
                 if used_prev[i]:
                     continue
-                
+
                 # Calculate distance between line midpoints
                 curr_mid_x = (curr_line.x1 + curr_line.x2) / 2
                 curr_mid_y = (curr_line.y1 + curr_line.y2) / 2
                 prev_mid_x = (prev_line.x1 + prev_line.x2) / 2
                 prev_mid_y = (prev_line.y1 + prev_line.y2) / 2
-                
-                distance = np.sqrt((curr_mid_x - prev_mid_x)**2 + (curr_mid_y - prev_mid_y)**2)
-                
+
+                distance = np.sqrt(
+                    (curr_mid_x - prev_mid_x) ** 2 + (curr_mid_y - prev_mid_y) ** 2
+                )
+
                 # Also check angle similarity
                 angle_diff = abs(curr_line.angle - prev_line.angle)
                 if angle_diff > 90:
                     angle_diff = 180 - angle_diff
-                
+
                 # Combined distance metric
                 combined_distance = distance + angle_diff * 5  # Weight angle difference
-                
-                if combined_distance < best_distance and combined_distance < 100:  # Threshold
+
+                if (
+                    combined_distance < best_distance and combined_distance < 100
+                ):  # Threshold
                     best_distance = combined_distance
                     best_match_idx = i
-            
+
             if best_match_idx >= 0:
                 # Smooth with previous line
                 prev_line = previous_lines[best_match_idx]
                 used_prev[best_match_idx] = True
-                
+
                 # Exponential moving average
                 alpha = self.smoothing_alpha
                 smoothed_x1 = int(curr_line.x1 * alpha + prev_line.x1 * (1 - alpha))
                 smoothed_y1 = int(curr_line.y1 * alpha + prev_line.y1 * (1 - alpha))
                 smoothed_x2 = int(curr_line.x2 * alpha + prev_line.x2 * (1 - alpha))
                 smoothed_y2 = int(curr_line.y2 * alpha + prev_line.y2 * (1 - alpha))
-                
+
                 # Recalculate angle and length
-                smoothed_angle = np.degrees(np.arctan2(smoothed_y2 - smoothed_y1, smoothed_x2 - smoothed_x1))
+                smoothed_angle = np.degrees(
+                    np.arctan2(smoothed_y2 - smoothed_y1, smoothed_x2 - smoothed_x1)
+                )
                 if smoothed_angle < 0:
                     smoothed_angle += 180
-                smoothed_length = np.sqrt((smoothed_x2 - smoothed_x1)**2 + (smoothed_y2 - smoothed_y1)**2)
-                
-                matched_lines.append(Line(smoothed_x1, smoothed_y1, smoothed_x2, smoothed_y2, 
-                                         smoothed_angle, smoothed_length))
+                smoothed_length = np.sqrt(
+                    (smoothed_x2 - smoothed_x1) ** 2 + (smoothed_y2 - smoothed_y1) ** 2
+                )
+
+                matched_lines.append(
+                    Line(
+                        smoothed_x1,
+                        smoothed_y1,
+                        smoothed_x2,
+                        smoothed_y2,
+                        smoothed_angle,
+                        smoothed_length,
+                    )
+                )
             else:
                 # No match found, use current line (new detection)
                 matched_lines.append(curr_line)
-        
+
         # Add unmatched previous lines (with decay)
         for i, prev_line in enumerate(previous_lines):
             if not used_prev[i]:
                 # Keep previous line but fade it out
                 matched_lines.append(prev_line)
-        
+
         return matched_lines
-    
+
     def reset_temporal_state(self) -> None:
         """Reset temporal smoothing state (call when starting a new video)."""
         self.prev_lane_lines = []
         self.prev_road_edges = []
 
     def visualize_lines(
-        self, image: np.ndarray, lines: List[Line], color: Tuple[int, int, int] = (0, 255, 0)
+        self,
+        image: np.ndarray,
+        lines: List[Line],
+        color: Tuple[int, int, int] = (0, 255, 0),
     ) -> np.ndarray:
         """
         Draw detected lines on an image.
@@ -407,4 +430,3 @@ class LineDetector:
                 cv2.line(result, (line.x1, line.y1), (line.x2, line.y2), color, 2)
 
         return result
-

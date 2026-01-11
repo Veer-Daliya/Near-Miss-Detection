@@ -6,7 +6,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -21,13 +21,13 @@ from src.filter import filter_pedestrians_in_vehicles  # noqa: E402
 from src.ground_plane import GroundPlaneEstimator  # noqa: E402
 from src.ingest import VideoReader  # noqa: E402
 from src.lpr import PlateAggregator, PlateDetector, PlateOCR, PlateResult  # noqa: E402
-from src.risk import NearMissDetector, CollisionRisk  # noqa: E402
-from src.track import (
+from src.risk import NearMissDetector  # noqa: E402
+from src.track import (  # noqa: E402
     ByteTracker,
     get_pedestrian_tracks,
     get_vehicle_tracks,
     validate_track_ids,
-)  # noqa: E402
+)
 from src.utils import draw_detections_with_labels  # noqa: E402
 
 
@@ -35,11 +35,13 @@ from src.utils import draw_detections_with_labels  # noqa: E402
 _VEHICLE_CLASSES = frozenset(["car", "truck", "bus", "motorcycle"])
 
 
-def save_yolo_detection_incremental(output_dir: str, frame_id: int, timestamp: float, detections: List[Detection]) -> None:
+def save_yolo_detection_incremental(
+    output_dir: str, frame_id: int, timestamp: float, detections: List[Detection]
+) -> None:
     """
     Save YOLO detections incrementally to JSON Lines file (append after each frame).
     Uses JSON Lines format (.jsonl) for efficient append-only writes.
-    
+
     Args:
         output_dir: Output directory
         frame_id: Frame ID
@@ -47,7 +49,7 @@ def save_yolo_detection_incremental(output_dir: str, frame_id: int, timestamp: f
         detections: List of Detection objects
     """
     jsonl_path = os.path.join(output_dir, "yolo_detections.jsonl")
-    
+
     # Prepare frame data
     frame_data = {
         "frame_id": frame_id,
@@ -56,7 +58,7 @@ def save_yolo_detection_incremental(output_dir: str, frame_id: int, timestamp: f
             {
                 "bbox": d.bbox,
                 "class_name": d.class_name,
-                "class_id": d.class_id if hasattr(d, 'class_id') else None,
+                "class_id": d.class_id if hasattr(d, "class_id") else None,
                 "confidence": d.confidence,
                 "track_id": d.track_id,
             }
@@ -64,17 +66,19 @@ def save_yolo_detection_incremental(output_dir: str, frame_id: int, timestamp: f
         ],
         "detection_count": len(detections),
     }
-    
+
     # Append as a single line (JSON Lines format)
     with open(jsonl_path, "a") as f:
         f.write(json.dumps(frame_data) + "\n")
 
 
-def save_ocr_detection_incremental(output_dir: str, frame_id: int, timestamp: float, ocr_results: List[dict]) -> None:
+def save_ocr_detection_incremental(
+    output_dir: str, frame_id: int, timestamp: float, ocr_results: List[dict]
+) -> None:
     """
     Save OCR detections incrementally to JSON Lines file (append after each frame).
     Uses JSON Lines format (.jsonl) for efficient append-only writes.
-    
+
     Args:
         output_dir: Output directory
         frame_id: Frame ID
@@ -82,7 +86,7 @@ def save_ocr_detection_incremental(output_dir: str, frame_id: int, timestamp: fl
         ocr_results: List of OCR result dictionaries
     """
     jsonl_path = os.path.join(output_dir, "ocr_bboxes.jsonl")
-    
+
     # Prepare frame data
     frame_data = {
         "frame_id": frame_id,
@@ -90,7 +94,7 @@ def save_ocr_detection_incremental(output_dir: str, frame_id: int, timestamp: fl
         "ocr_results": ocr_results,
         "ocr_count": len(ocr_results),
     }
-    
+
     # Append as a single line (JSON Lines format)
     with open(jsonl_path, "a") as f:
         f.write(json.dumps(frame_data) + "\n")
@@ -99,12 +103,12 @@ def save_ocr_detection_incremental(output_dir: str, frame_id: int, timestamp: fl
 def _get_raw_ocr_data(ocr, plate_image: np.ndarray, ocr_result) -> dict:
     """
     Extract raw OCR data including all candidates and preprocessing info.
-    
+
     Args:
         ocr: PlateOCR instance
         plate_image: Original plate image crop
         ocr_result: PlateResult from OCR extraction
-    
+
     Returns:
         Dictionary with raw OCR data
     """
@@ -113,71 +117,87 @@ def _get_raw_ocr_data(ocr, plate_image: np.ndarray, ocr_result) -> dict:
         "all_candidates": [],
         "preprocessing": {},
     }
-    
+
     try:
         # Get preprocessing info
-        h, w = plate_image.shape[:2] if len(plate_image.shape) == 2 else plate_image.shape[:2]
+        h, w = (
+            plate_image.shape[:2]
+            if len(plate_image.shape) == 2
+            else plate_image.shape[:2]
+        )
         raw_data["preprocessing"] = {
             "original_size": [w, h],
             "grayscale": len(plate_image.shape) == 2,
         }
-        
+
         # Get all OCR candidates based on engine type
         if ocr.ocr_engine == "paddleocr":
             # Run PaddleOCR again to get all results
-            if hasattr(ocr, 'ocr'):
+            if hasattr(ocr, "ocr"):
                 ocr_instance = ocr.ocr
                 results = ocr_instance.ocr(plate_image)
-                
+
                 if results:
-                    ocr_result_data = results[0] if isinstance(results, list) else results
-                    
+                    ocr_result_data = (
+                        results[0] if isinstance(results, list) else results
+                    )
+
                     # Handle new dictionary format
                     if isinstance(ocr_result_data, dict):
-                        rec_texts = ocr_result_data.get('rec_texts', [])
-                        rec_scores = ocr_result_data.get('rec_scores', [])
-                        
+                        rec_texts = ocr_result_data.get("rec_texts", [])
+                        rec_scores = ocr_result_data.get("rec_scores", [])
+
                         # Store all candidates
                         for text, score in zip(rec_texts, rec_scores):
-                            raw_data["all_candidates"].append({
-                                "text": text,
-                                "confidence": float(score),
-                            })
-                        
-                        raw_data["raw_text"] = " ".join(rec_texts) if rec_texts else ocr_result.text
+                            raw_data["all_candidates"].append(
+                                {
+                                    "text": text,
+                                    "confidence": float(score),
+                                }
+                            )
+
+                        raw_data["raw_text"] = (
+                            " ".join(rec_texts) if rec_texts else ocr_result.text
+                        )
                     # Handle old tuple format
                     elif isinstance(ocr_result_data, list):
                         for line in ocr_result_data:
                             if isinstance(line, tuple) and len(line) == 2:
                                 bbox, (text, confidence) = line
-                                raw_data["all_candidates"].append({
-                                    "text": text,
-                                    "confidence": float(confidence),
-                                })
+                                raw_data["all_candidates"].append(
+                                    {
+                                        "text": text,
+                                        "confidence": float(confidence),
+                                    }
+                                )
         elif ocr.ocr_engine == "easyocr":
             # Run EasyOCR again to get all results
-            if hasattr(ocr, 'reader'):
+            if hasattr(ocr, "reader"):
                 results = ocr.reader.readtext(plate_image)
-                
+
                 # Store all candidates
                 for bbox, text, confidence in results:
-                    raw_data["all_candidates"].append({
-                        "text": text,
-                        "confidence": float(confidence),
-                    })
-                
+                    raw_data["all_candidates"].append(
+                        {
+                            "text": text,
+                            "confidence": float(confidence),
+                        }
+                    )
+
                 # Get raw text (all detections concatenated)
                 if results:
                     raw_data["raw_text"] = " ".join([text for _, text, _ in results])
-    
+
     except Exception as e:
         # If extraction fails, at least return the best result
-        raw_data["all_candidates"] = [{
-            "text": ocr_result.text,
-            "confidence": ocr_result.confidence,
-        }]
+        raw_data["all_candidates"] = [
+            {
+                "text": ocr_result.text,
+                "confidence": ocr_result.confidence,
+            }
+        ]
         raw_data["error"] = str(e)
-    
+
     return raw_data
 
 
@@ -186,49 +206,49 @@ def associate_plates_to_vehicles(
 ) -> List[PlateResult]:
     """
     Associate plate results with vehicle detections.
-    
+
     Optimized: Filters vehicles once and uses spatial proximity.
     """
     if not plate_results:
         return plate_results
-    
+
     # Filter vehicles once (O(n) instead of O(n*m))
     vehicles = [d for d in detections if d.class_name in _VEHICLE_CLASSES]
-    
+
     if not vehicles:
         return plate_results
-    
+
     # Pre-compute vehicle centers for faster distance calculation
     vehicle_centers = []
     for vehicle in vehicles:
         cx = (vehicle.bbox[0] + vehicle.bbox[2]) * 0.5
         cy = (vehicle.bbox[1] + vehicle.bbox[3]) * 0.5
         vehicle_centers.append((cx, cy, vehicle))
-    
+
     # Associate each plate to nearest vehicle
     for plate in plate_results:
         if not plate.bbox:
             continue
-            
+
         plate_cx = (plate.bbox[0] + plate.bbox[2]) * 0.5
         plate_cy = (plate.bbox[1] + plate.bbox[3]) * 0.5
-        
+
         best_vehicle = None
         min_distance_sq = float("inf")
-        
+
         # Find closest vehicle (using squared distance to avoid sqrt)
         for vx, vy, vehicle in vehicle_centers:
             dx = plate_cx - vx
             dy = plate_cy - vy
             distance_sq = dx * dx + dy * dy
-            
+
             if distance_sq < min_distance_sq:
                 min_distance_sq = distance_sq
                 best_vehicle = vehicle
-        
+
         if best_vehicle and best_vehicle.track_id:
             plate.vehicle_track_id = best_vehicle.track_id
-    
+
     return plate_results
 
 
@@ -265,35 +285,42 @@ def process_video(
     detector = YOLODetector(
         model_size=model_size, confidence_threshold=confidence_threshold
     )
-    
+
     # Print GPU optimization info
     if batch_size > 1 and detector.device in ["cuda", "mps"]:
         print(f"GPU batch processing enabled: batch_size={batch_size}")
     elif batch_size > 1:
-        print("Warning: Batch size > 1 specified but GPU not available. Using batch_size=1")
+        print(
+            "Warning: Batch size > 1 specified but GPU not available. Using batch_size=1"
+        )
         batch_size = 1
-    
+
     # Initialize plate detector (requires PaddleOCR)
     plate_detector = None
     try:
-        plate_detector = PlateDetector(confidence_threshold=0.3)  # Lowered for better detection
+        plate_detector = PlateDetector(
+            confidence_threshold=0.3
+        )  # Lowered for better detection
         print("Plate detector initialized (PaddleOCR)")
     except ImportError:
-        print("Warning: Plate detection not available. Install PaddleOCR for license plate detection.")
+        print(
+            "Warning: Plate detection not available. Install PaddleOCR for license plate detection."
+        )
 
     # Initialize OCR (optional - may fail if not installed)
     # Auto-select best OCR engine for GPU acceleration
     ocr = None
-    
+
     # Detect if we're on Apple Silicon (MPS GPU available)
     is_apple_silicon = False
     try:
         import torch
+
         if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             is_apple_silicon = True
     except ImportError:
         pass
-    
+
     # Prefer EasyOCR on Apple Silicon (uses GPU), PaddleOCR otherwise
     if is_apple_silicon:
         # Try EasyOCR first (supports Apple Silicon GPU via PyTorch MPS)
@@ -306,7 +333,9 @@ def process_video(
                 ocr = PlateOCR(ocr_engine="paddleocr")
                 print("OCR initialized (PaddleOCR - CPU mode, EasyOCR not available)")
             except ImportError:
-                print("Warning: OCR not available. Install EasyOCR for GPU acceleration or PaddleOCR for CPU.")
+                print(
+                    "Warning: OCR not available. Install EasyOCR for GPU acceleration or PaddleOCR for CPU."
+                )
     else:
         # On non-Apple Silicon, try PaddleOCR first (can use CUDA GPU if available)
         try:
@@ -318,7 +347,9 @@ def process_video(
                 ocr = PlateOCR(ocr_engine="easyocr")
                 print("OCR initialized (EasyOCR)")
             except ImportError:
-                print("Warning: OCR not available. Install PaddleOCR or EasyOCR for plate text extraction.")
+                print(
+                    "Warning: OCR not available. Install PaddleOCR or EasyOCR for plate text extraction."
+                )
 
     # Initialize plate aggregator for multi-frame aggregation
     aggregator = None
@@ -341,7 +372,7 @@ def process_video(
         width = reader.get_width()
         height = reader.get_height()
         source_fps = reader.get_fps()
-        
+
         # Initialize tracker (uses YOLO model's built-in tracking)
         tracker = None
         try:
@@ -361,33 +392,35 @@ def process_video(
             output_video_path = os.path.join(output_dir, "annotated_output.mp4")
             # Use H.264 codec for better compatibility (avc1)
             # Fallback to mp4v if avc1 not available
-            fourcc = cv2.VideoWriter_fourcc(*"avc1")
+            fourcc = cv2.VideoWriter_fourcc(*"avc1")  # type: ignore[attr-defined]
             if not fourcc:
-                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
             video_writer = cv2.VideoWriter(
                 output_video_path, fourcc, source_fps, (width, height)
             )
             if not video_writer.isOpened():
                 print("Warning: Could not open video writer with avc1, trying mp4v...")
-                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
                 video_writer = cv2.VideoWriter(
                     output_video_path, fourcc, source_fps, (width, height)
                 )
-            print(f"Video writer initialized: {output_video_path} ({width}x{height} @ {source_fps} FPS)")
+            print(
+                f"Video writer initialized: {output_video_path} ({width}x{height} @ {source_fps} FPS)"
+            )
 
         # Get total frame count for progress bar
-        total_frames = reader.get_frame_count()
+        total_frames: Optional[int] = reader.get_frame_count()
         if total_frames == 0:
             # If frame count unavailable (RTSP streams, etc.), use None for indeterminate
             total_frames = None
 
         # Process frames
-        all_results = []
-        all_ocr_results = []  # Store all OCR outputs separately
-        all_near_miss_events = []  # Store all near-miss events
+        all_results: List[Dict[str, Any]] = []
+        all_ocr_results: List[Dict[str, Any]] = []  # Store all OCR outputs separately
+        all_near_miss_events: List[Dict[str, Any]] = []  # Store all near-miss events
         frame_count = 0
         track_id_counter = 0  # Fallback counter if tracker not available
-        
+
         # Phase 1.3: Track separation - maintain track histories across frames
         # Dictionary to store all detections by track_id for track history
         track_histories: dict[int, list[Detection]] = {}
@@ -418,7 +451,9 @@ def process_video(
                     if frame_count == 1:
                         print(f"\n⚠️  Warning: Tracker failed: {e}")
                         print("   Install 'lap' package for tracking: pip3 install lap")
-                        print("   Continuing with fallback detection (IDs may change per frame)\n")
+                        print(
+                            "   Continuing with fallback detection (IDs may change per frame)\n"
+                        )
                     # Fallback: run detection separately
                     detections = detector.detect(frame, frame_id=frame_id)
                     for detection in detections:
@@ -435,7 +470,9 @@ def process_video(
                         detection.track_id = track_id_counter
 
             # Filter out pedestrians inside vehicles (spatial filtering)
-            detections = filter_pedestrians_in_vehicles(detections, overlap_threshold=0.7)
+            detections = filter_pedestrians_in_vehicles(
+                detections, overlap_threshold=0.7
+            )
 
             # Phase 1.3: Track separation - update track histories and separate tracks
             # Update track histories with current frame detections
@@ -444,11 +481,11 @@ def process_video(
                     if detection.track_id not in track_histories:
                         track_histories[detection.track_id] = []
                     track_histories[detection.track_id].append(detection)
-            
+
             # Separate pedestrian and vehicle tracks (for Phase 4 risk scoring)
             pedestrian_tracks = get_pedestrian_tracks(detections)
             vehicle_tracks = get_vehicle_tracks(detections)
-            
+
             # Validate track IDs are maintained correctly (optional check)
             if frame_count % 100 == 0:  # Check every 100 frames to avoid overhead
                 is_valid = validate_track_ids(detections)
@@ -479,18 +516,22 @@ def process_video(
                 # Store critical/warning events
                 for event in frame_near_miss_events:
                     if event.risk_level in ("critical", "warning"):
-                        all_near_miss_events.append({
-                            "frame_id": frame_id,
-                            "timestamp": timestamp,
-                            "pedestrian_track_id": event.pedestrian_track_id,
-                            "vehicle_track_id": event.vehicle_track_id,
-                            "ttc": event.ttc,
-                            "min_distance": event.min_distance,
-                            "risk_level": event.risk_level,
-                        })
+                        all_near_miss_events.append(
+                            {
+                                "frame_id": frame_id,
+                                "timestamp": timestamp,
+                                "pedestrian_track_id": event.pedestrian_track_id,
+                                "vehicle_track_id": event.vehicle_track_id,
+                                "ttc": event.ttc,
+                                "min_distance": event.min_distance,
+                                "risk_level": event.risk_level,
+                            }
+                        )
 
             # Update progress bar description with current stats
-            near_miss_count = len([e for e in frame_near_miss_events if e.risk_level == "critical"])
+            near_miss_count = len(
+                [e for e in frame_near_miss_events if e.risk_level == "critical"]
+            )
             pbar.set_description(
                 f"Processing frames (Frame {frame_count}, {len(detections)} det, "
                 f"{len(pedestrian_tracks)} ped, {len(vehicle_tracks)} veh, {near_miss_count} risk)"
@@ -505,12 +546,18 @@ def process_video(
                 ]
                 if vehicle_bboxes:
                     try:
-                        plate_results = plate_detector.detect_on_frame(frame, vehicle_bboxes)
+                        plate_results = plate_detector.detect_on_frame(
+                            frame, vehicle_bboxes
+                        )
                         # Debug: Print plate detection stats occasionally
                         if plate_results and frame_count % 30 == 0:
-                            print(f"  [Frame {frame_count}] Detected {len(plate_results)} plate regions on {len(vehicle_bboxes)} vehicles")
+                            print(
+                                f"  [Frame {frame_count}] Detected {len(plate_results)} plate regions on {len(vehicle_bboxes)} vehicles"
+                            )
                     except Exception as e:
-                        print(f"Warning: Plate detection failed on frame {frame_count}: {e}")
+                        print(
+                            f"Warning: Plate detection failed on frame {frame_count}: {e}"
+                        )
 
             # Extract plate text with OCR (only on frames where plates were detected)
             # Optimization: Skip OCR if we already have high-confidence aggregated results
@@ -527,28 +574,33 @@ def process_video(
                             if (
                                 aggregated
                                 and aggregated.confidence >= 0.8
-                                and aggregator.get_track_count(plate.vehicle_track_id) >= 3
+                                and aggregator.get_track_count(plate.vehicle_track_id)
+                                >= 3
                             ):
                                 skip_ocr = True
                                 # Use aggregated result instead of running OCR
                                 plate.text = aggregated.text
                                 plate.confidence = aggregated.confidence
-                                
+
                                 # Store aggregated result in OCR outputs
-                                frame_ocr_results.append({
-                                    "plate_index": plate_idx,
-                                    "vehicle_track_id": plate.vehicle_track_id,
-                                    "bbox": plate.bbox,
-                                    "source": "aggregated",
-                                    "text": aggregated.text,
-                                    "confidence": aggregated.confidence,
-                                    "raw_text": aggregated.text,
-                                    "all_candidates": [{
+                                frame_ocr_results.append(
+                                    {
+                                        "plate_index": plate_idx,
+                                        "vehicle_track_id": plate.vehicle_track_id,
+                                        "bbox": plate.bbox,
+                                        "source": "aggregated",
                                         "text": aggregated.text,
                                         "confidence": aggregated.confidence,
-                                    }],
-                                })
-                        
+                                        "raw_text": aggregated.text,
+                                        "all_candidates": [
+                                            {
+                                                "text": aggregated.text,
+                                                "confidence": aggregated.confidence,
+                                            }
+                                        ],
+                                    }
+                                )
+
                         if not skip_ocr:
                             x1, y1, x2, y2 = plate.bbox
                             plate_crop = frame[y1:y2, x1:x2]
@@ -558,58 +610,81 @@ def process_video(
                                     ocr_result = ocr.extract_text(plate_crop)
                                     plate.text = ocr_result.text
                                     plate.confidence = ocr_result.confidence
-                                    
+
                                     # Get raw OCR data for saving
-                                    raw_ocr_data = _get_raw_ocr_data(ocr, plate_crop, ocr_result)
-                                    
+                                    raw_ocr_data = _get_raw_ocr_data(
+                                        ocr, plate_crop, ocr_result
+                                    )
+
                                     # Store OCR output
-                                    frame_ocr_results.append({
-                                        "plate_index": plate_idx,
-                                        "vehicle_track_id": plate.vehicle_track_id,
-                                        "bbox": plate.bbox,
-                                        "source": "ocr",
-                                        "ocr_engine": ocr.ocr_engine,
-                                        "text": ocr_result.text,
-                                        "confidence": ocr_result.confidence,
-                                        "raw_text": raw_ocr_data.get("raw_text", ocr_result.text),
-                                        "all_candidates": raw_ocr_data.get("all_candidates", [{
+                                    frame_ocr_results.append(
+                                        {
+                                            "plate_index": plate_idx,
+                                            "vehicle_track_id": plate.vehicle_track_id,
+                                            "bbox": plate.bbox,
+                                            "source": "ocr",
+                                            "ocr_engine": ocr.ocr_engine,
                                             "text": ocr_result.text,
                                             "confidence": ocr_result.confidence,
-                                        }]),
-                                        "preprocessing_applied": raw_ocr_data.get("preprocessing", {}),
-                                    })
+                                            "raw_text": raw_ocr_data.get(
+                                                "raw_text", ocr_result.text
+                                            ),
+                                            "all_candidates": raw_ocr_data.get(
+                                                "all_candidates",
+                                                [
+                                                    {
+                                                        "text": ocr_result.text,
+                                                        "confidence": ocr_result.confidence,
+                                                    }
+                                                ],
+                                            ),
+                                            "preprocessing_applied": raw_ocr_data.get(
+                                                "preprocessing", {}
+                                            ),
+                                        }
+                                    )
                                 except Exception as e:
                                     # If OCR fails, keep plate detection but mark as unknown
                                     plate.text = "UNKNOWN"
                                     plate.confidence = 0.0
-                                    
+
                                     # Store error in OCR outputs
-                                    frame_ocr_results.append({
-                                        "plate_index": plate_idx,
-                                        "vehicle_track_id": plate.vehicle_track_id,
-                                        "bbox": plate.bbox,
-                                        "source": "ocr",
-                                        "ocr_engine": ocr.ocr_engine if ocr else None,
-                                        "error": str(e),
-                                        "text": "UNKNOWN",
-                                        "confidence": 0.0,
-                                    })
-            
+                                    frame_ocr_results.append(
+                                        {
+                                            "plate_index": plate_idx,
+                                            "vehicle_track_id": plate.vehicle_track_id,
+                                            "bbox": plate.bbox,
+                                            "source": "ocr",
+                                            "ocr_engine": ocr.ocr_engine
+                                            if ocr
+                                            else None,
+                                            "error": str(e),
+                                            "text": "UNKNOWN",
+                                            "confidence": 0.0,
+                                        }
+                                    )
+
             # Store OCR results for this frame
             if frame_ocr_results:
-                all_ocr_results.append({
-                    "frame_id": frame_id,
-                    "timestamp": timestamp,
-                    "ocr_results": frame_ocr_results,
-                })
-            
+                all_ocr_results.append(
+                    {
+                        "frame_id": frame_id,
+                        "timestamp": timestamp,
+                        "ocr_results": frame_ocr_results,
+                    }
+                )
+
             # Save YOLO detections incrementally (after each frame)
             if save_json:
-                save_yolo_detection_incremental(output_dir, frame_id, timestamp, detections)
-            
+                save_yolo_detection_incremental(
+                    output_dir, frame_id, timestamp, detections
+                )
+
             # Save OCR detections incrementally (after each frame, if any)
             if save_json and frame_ocr_results:
-                save_ocr_detection_incremental(output_dir, frame_id, timestamp, frame_ocr_results)
+                save_ocr_detection_incremental(
+                    output_dir, frame_id, timestamp, frame_ocr_results
+                )
 
             # Associate plates with vehicles
             plate_results = associate_plates_to_vehicles(detections, plate_results)
@@ -624,7 +699,11 @@ def process_video(
             display_plate_results = []
             if aggregator:
                 # Get aggregated results for all vehicles with plates
-                vehicle_track_ids = {p.vehicle_track_id for p in plate_results if p.vehicle_track_id is not None}
+                vehicle_track_ids = {
+                    p.vehicle_track_id
+                    for p in plate_results
+                    if p.vehicle_track_id is not None
+                }
                 for track_id in vehicle_track_ids:
                     aggregated = aggregator.aggregate(track_id)
                     if aggregated:
@@ -645,7 +724,7 @@ def process_video(
             # Store results
             # Use aggregated results for JSON output if available
             json_plate_results = display_plate_results if aggregator else plate_results
-            
+
             frame_result = {
                 "frame_id": frame_id,
                 "timestamp": timestamp,
@@ -676,7 +755,9 @@ def process_video(
                         "risk_level": e.risk_level,
                     }
                     for e in frame_near_miss_events
-                ] if frame_near_miss_events else [],
+                ]
+                if frame_near_miss_events
+                else [],
             }
             all_results.append(frame_result)
 
@@ -696,17 +777,23 @@ def process_video(
         with open(json_path, "w") as f:
             json.dump(all_results, f, indent=2)
         print(f"Results saved to {json_path}")
-        
+
         # Note: OCR results are already saved incrementally to ocr_bboxes.jsonl
         # This is just for summary reporting
         if all_ocr_results:
-            print(f"OCR results saved incrementally to {os.path.join(output_dir, 'ocr_bboxes.jsonl')}")
+            print(
+                f"OCR results saved incrementally to {os.path.join(output_dir, 'ocr_bboxes.jsonl')}"
+            )
             print(f"Total OCR frames: {len(all_ocr_results)}")
-            total_ocr_detections = sum(len(frame_data["ocr_results"]) for frame_data in all_ocr_results)
+            total_ocr_detections = sum(
+                len(frame_data["ocr_results"]) for frame_data in all_ocr_results
+            )
             print(f"Total OCR detections: {total_ocr_detections}")
 
     if save_annotated:
-        print(f"Annotated video saved to {os.path.join(output_dir, 'annotated_output.mp4')}")
+        print(
+            f"Annotated video saved to {os.path.join(output_dir, 'annotated_output.mp4')}"
+        )
 
     # Save near-miss events summary
     if enable_near_miss and all_near_miss_events:
@@ -720,34 +807,42 @@ def process_video(
     print(f"Total detections: {sum(len(r['detections']) for r in all_results)}")
     print(f"Total plates detected: {sum(len(r['plates']) for r in all_results)}")
     if all_ocr_results:
-        total_ocr_detections = sum(len(frame_data["ocr_results"]) for frame_data in all_ocr_results)
-        print(f"Total OCR results: {len(all_ocr_results)} frames, {total_ocr_detections} detections")
+        total_ocr_detections = sum(
+            len(frame_data["ocr_results"]) for frame_data in all_ocr_results
+        )
+        print(
+            f"Total OCR results: {len(all_ocr_results)} frames, {total_ocr_detections} detections"
+        )
     if enable_near_miss:
-        critical_count = len([e for e in all_near_miss_events if e["risk_level"] == "critical"])
-        warning_count = len([e for e in all_near_miss_events if e["risk_level"] == "warning"])
+        critical_count = len(
+            [e for e in all_near_miss_events if e["risk_level"] == "critical"]
+        )
+        warning_count = len(
+            [e for e in all_near_miss_events if e["risk_level"] == "warning"]
+        )
         print(f"Near-miss events: {critical_count} critical, {warning_count} warning")
-    
+
     # Phase 1.3: Print track separation statistics
     if track_histories:
         # Get final separated tracks from last frame detections
         if all_results and len(all_results) > 0:
-            last_frame_detections = all_results[-1]['detections']
+            last_frame_detections = all_results[-1]["detections"]
             # Convert dict detections back to Detection objects for track separation
             detection_objects = []
             for d in last_frame_detections:
                 detection_objects.append(
                     Detection(
-                        bbox=d['bbox'],
-                        class_id=d.get('class_id', 0),
-                        class_name=d['class_name'],
-                        confidence=d['confidence'],
-                        frame_id=all_results[-1]['frame_id'],
-                        track_id=d.get('track_id'),
+                        bbox=d["bbox"],
+                        class_id=d.get("class_id", 0),
+                        class_name=d["class_name"],
+                        confidence=d["confidence"],
+                        frame_id=all_results[-1]["frame_id"],
+                        track_id=d.get("track_id"),
                     )
                 )
             ped_tracks = get_pedestrian_tracks(detection_objects)
             veh_tracks = get_vehicle_tracks(detection_objects)
-            print(f"\nPhase 1.3 Track Separation Statistics:")
+            print("\nPhase 1.3 Track Separation Statistics:")
             print(f"  Pedestrian tracks: {len(ped_tracks)}")
             print(f"  Vehicle tracks: {len(veh_tracks)}")
             print(f"  Total unique track IDs across video: {len(track_histories)}")
@@ -829,8 +924,10 @@ def main() -> None:
     # Validate batch size
     batch_size = max(1, min(8, args.batch_size))  # Clamp between 1 and 8
     if args.batch_size != batch_size:
-        print(f"Warning: Batch size adjusted from {args.batch_size} to {batch_size} (valid range: 1-8)")
-    
+        print(
+            f"Warning: Batch size adjusted from {args.batch_size} to {batch_size} (valid range: 1-8)"
+        )
+
     process_video(
         source=args.source,
         output_dir=args.output_dir,
@@ -848,4 +945,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

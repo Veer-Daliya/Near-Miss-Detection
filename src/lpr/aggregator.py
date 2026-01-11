@@ -9,7 +9,7 @@ from src.lpr.plate_types import PlateResult
 class PlateAggregator:
     """
     Aggregates license plate OCR results across multiple frames.
-    
+
     Uses character-level voting and confidence weighting to improve accuracy.
     """
 
@@ -112,7 +112,9 @@ class PlateAggregator:
             return ("UNKNOWN", 0.0)
 
         # Character-level voting
-        char_votes: Dict[int, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        char_votes: Dict[int, Dict[str, float]] = defaultdict(
+            lambda: defaultdict(float)
+        )
 
         for text, conf in zip(texts, confidences):
             # Pad shorter texts (assume missing chars are at end)
@@ -143,7 +145,9 @@ class PlateAggregator:
         aggregated_text = "".join(aggregated_chars).rstrip("?")
 
         # Average confidence across positions
-        avg_confidence = total_confidence / len(aggregated_chars) if aggregated_chars else 0.0
+        avg_confidence = (
+            total_confidence / len(aggregated_chars) if aggregated_chars else 0.0
+        )
 
         # Also consider overall agreement (how many results agree)
         agreement_ratio = self._calculate_agreement(texts, aggregated_text)
@@ -166,7 +170,7 @@ class PlateAggregator:
             return 0.0
 
         # Count how many texts match aggregated result (allowing for minor differences)
-        matches = 0
+        matches: float = 0.0
         for text in texts:
             # Exact match
             if text == aggregated_text:
@@ -191,7 +195,3 @@ class PlateAggregator:
     def get_track_count(self, vehicle_track_id: int) -> int:
         """Get number of plate results for a track."""
         return len(self.plate_history.get(vehicle_track_id, []))
-
-
-
-

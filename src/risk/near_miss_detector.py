@@ -139,7 +139,9 @@ class NearMissDetector:
 
             # Convert to ground plane coordinates
             position_ground = self._get_ground_position(
-                ground_plane_estimator, center_x, y2  # Use bottom of bbox for ground
+                ground_plane_estimator,
+                center_x,
+                y2,  # Use bottom of bbox for ground
             )
 
             # Update trajectory and get velocity

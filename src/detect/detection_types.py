@@ -19,8 +19,3 @@ class Detection:
         """Validate bbox format."""
         if len(self.bbox) != 4:
             raise ValueError("bbox must have 4 elements [x1, y1, x2, y2]")
-
-
-
-
-

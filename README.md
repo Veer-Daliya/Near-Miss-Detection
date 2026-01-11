@@ -47,11 +47,11 @@
 
 <div align="center">
 
-<a href="https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/paper/near_miss_detection.pdf">
+<a href="https://github.com/Veer-Daliya/Near-Miss-Detection/raw/main/docs/paper/near_miss_detection.pdf">
 <img src="assets/paper_thumbnail.png" alt="Research Paper" width="300"/>
 </a>
 
-**[Download Paper (PDF)](https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/paper/near_miss_detection.pdf)**
+**[Download Paper (PDF)](https://github.com/Veer-Daliya/Near-Miss-Detection/raw/main/docs/paper/near_miss_detection.pdf)**
 
 *Real-Time Pedestrian-Vehicle Collision Risk Assessment Using Physics-Based Trajectory Analysis and Multi-Modal Computer Vision*
 
@@ -63,11 +63,11 @@
 
 <div align="center">
 
-<a href="https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/presentation/near_miss_presentation.pdf">
+<a href="https://github.com/Veer-Daliya/Near-Miss-Detection/raw/main/docs/presentation/near_miss_presentation.pdf">
 <img src="assets/presentation_thumbnail.png" alt="Presentation" width="300"/>
 </a>
 
-**[Download Presentation (PDF)](https://github.com/InspiritAI/Near-Miss-Detection/raw/main/docs/presentation/near_miss_presentation.pdf)**
+**[Download Presentation (PDF)](https://github.com/Veer-Daliya/Near-Miss-Detection/raw/main/docs/presentation/near_miss_presentation.pdf)**
 
 *15-minute technical presentation with speaker notes*
 
@@ -170,7 +170,7 @@ python scripts/run_detection.py \
 
 ```bash
 # Clone the repository
-git clone https://github.com/InspiritAI/Near-Miss-Detection.git
+git clone https://github.com/Veer-Daliya/Near-Miss-Detection.git
 cd Near-Miss-Detection
 
 # Create virtual environment

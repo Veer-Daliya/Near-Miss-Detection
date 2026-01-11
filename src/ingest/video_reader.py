@@ -54,6 +54,8 @@ class VideoReader:
         if self.cap is None:
             self.open()
 
+        assert self.cap is not None  # Set by open()
+
         frame_skip = 1
         if self.target_fps and self.source_fps:
             frame_skip = max(1, int(self.source_fps / self.target_fps))
@@ -91,4 +93,3 @@ class VideoReader:
         if self.cap is None:
             return 0
         return int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
