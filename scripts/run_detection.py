@@ -655,9 +655,9 @@ def process_video(
                                             "vehicle_track_id": plate.vehicle_track_id,
                                             "bbox": plate.bbox,
                                             "source": "ocr",
-                                            "ocr_engine": ocr.ocr_engine
-                                            if ocr
-                                            else None,
+                                            "ocr_engine": (
+                                                ocr.ocr_engine if ocr else None
+                                            ),
                                             "error": str(e),
                                             "text": "UNKNOWN",
                                             "confidence": 0.0,
@@ -746,18 +746,20 @@ def process_video(
                     }
                     for p in json_plate_results
                 ],
-                "near_miss_events": [
-                    {
-                        "pedestrian_track_id": e.pedestrian_track_id,
-                        "vehicle_track_id": e.vehicle_track_id,
-                        "ttc": e.ttc,
-                        "min_distance": e.min_distance,
-                        "risk_level": e.risk_level,
-                    }
-                    for e in frame_near_miss_events
-                ]
-                if frame_near_miss_events
-                else [],
+                "near_miss_events": (
+                    [
+                        {
+                            "pedestrian_track_id": e.pedestrian_track_id,
+                            "vehicle_track_id": e.vehicle_track_id,
+                            "ttc": e.ttc,
+                            "min_distance": e.min_distance,
+                            "risk_level": e.risk_level,
+                        }
+                        for e in frame_near_miss_events
+                    ]
+                    if frame_near_miss_events
+                    else []
+                ),
             }
             all_results.append(frame_result)
 
