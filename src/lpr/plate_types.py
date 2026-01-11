@@ -12,4 +12,3 @@ class PlateResult:
     confidence: float  # 0.0 - 1.0
     bbox: List[int]  # [x1, y1, x2, y2] in frame coordinates
     vehicle_track_id: Optional[int] = None  # Associated vehicle track ID
-

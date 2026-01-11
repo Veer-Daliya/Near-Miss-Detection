@@ -108,7 +108,9 @@ class GroundPlaneEstimator:
         self._image_width: int = 0
         self._image_height: int = 0
 
-    def estimate(self, image: np.ndarray, force_update: bool = False) -> GroundPlaneEstimate:
+    def estimate(
+        self, image: np.ndarray, force_update: bool = False
+    ) -> GroundPlaneEstimate:
         """Estimate the ground plane from an image.
 
         Tries methods in order: lane-based -> horizon-based -> size-based
@@ -127,7 +129,8 @@ class GroundPlaneEstimator:
         if (
             not force_update
             and self._cached_estimate is not None
-            and (self._frame_count - self._cached_estimate.frame_number) < self.cache_frames
+            and (self._frame_count - self._cached_estimate.frame_number)
+            < self.cache_frames
         ):
             return self._cached_estimate
 
@@ -313,31 +316,37 @@ class GroundPlaneEstimator:
             3x3 homography matrix
         """
         vp_x, vp_y = vanishing_point
-        cx = self._image_width / 2
-        cy = self._image_height / 2
+        _cx = self._image_width / 2  # noqa: F841
+        _cy = self._image_height / 2  # noqa: F841
 
         # Create a simple homography based on vanishing point
         # This maps the image to a bird's-eye view perspective
         # Source points: corners of lower portion of image
-        src_pts = np.float32([
-            [0, self._image_height],
-            [self._image_width, self._image_height],
-            [self._image_width, vp_y + (self._image_height - vp_y) * 0.3],
-            [0, vp_y + (self._image_height - vp_y) * 0.3],
-        ])
+        src_pts = np.array(
+            [
+                [0, self._image_height],
+                [self._image_width, self._image_height],
+                [self._image_width, vp_y + (self._image_height - vp_y) * 0.3],
+                [0, vp_y + (self._image_height - vp_y) * 0.3],
+            ],
+            dtype=np.float32,
+        )
 
         # Destination points: rectangle (bird's eye view)
         width = 400
         height = 600
-        dst_pts = np.float32([
-            [0, height],
-            [width, height],
-            [width, 0],
-            [0, 0],
-        ])
+        dst_pts = np.array(
+            [
+                [0, height],
+                [width, height],
+                [width, 0],
+                [0, 0],
+            ],
+            dtype=np.float32,
+        )
 
         homography = cv2.getPerspectiveTransform(src_pts, dst_pts)
-        return homography
+        return homography  # type: ignore[return-value]
 
     def _compute_lane_confidence(
         self, lines: List[Line], vanishing_point: Tuple[float, float]
@@ -373,14 +382,14 @@ class GroundPlaneEstimator:
             convergence_errors.append(error)
 
         if convergence_errors:
-            avg_error = np.mean(convergence_errors)
-            convergence_score = max(0, 1 - avg_error / self._image_width)
+            avg_error = float(np.mean(convergence_errors))
+            convergence_score = max(0.0, 1.0 - avg_error / self._image_width)
         else:
             convergence_score = 0.5
 
         # Total line length as quality indicator
         total_length = sum(line.length for line in lines)
-        length_score = min(total_length / (self._image_width * 2), 1.0)
+        length_score = float(min(total_length / (self._image_width * 2), 1.0))
 
         # Weighted combination
         confidence = (
@@ -441,9 +450,7 @@ class GroundPlaneEstimator:
         edge_strength_ratio = max_response / mean_response
         position_score = 1 - abs(horizon_y / self._image_height - 0.35) / 0.35
 
-        confidence = min(
-            0.5 * (edge_strength_ratio / 5.0) + 0.5 * position_score, 0.85
-        )
+        confidence = min(0.5 * (edge_strength_ratio / 5.0) + 0.5 * position_score, 0.85)
 
         if confidence < self.horizon_detection_threshold:
             return None
@@ -470,24 +477,30 @@ class GroundPlaneEstimator:
             3x3 homography matrix
         """
         # Similar to vanishing point method, but centered
-        src_pts = np.float32([
-            [0, self._image_height],
-            [self._image_width, self._image_height],
-            [self._image_width, horizon_y + (self._image_height - horizon_y) * 0.2],
-            [0, horizon_y + (self._image_height - horizon_y) * 0.2],
-        ])
+        src_pts = np.array(
+            [
+                [0, self._image_height],
+                [self._image_width, self._image_height],
+                [self._image_width, horizon_y + (self._image_height - horizon_y) * 0.2],
+                [0, horizon_y + (self._image_height - horizon_y) * 0.2],
+            ],
+            dtype=np.float32,
+        )
 
         width = 400
         height = 600
-        dst_pts = np.float32([
-            [0, height],
-            [width, height],
-            [width, 0],
-            [0, 0],
-        ])
+        dst_pts = np.array(
+            [
+                [0, height],
+                [width, height],
+                [width, 0],
+                [0, 0],
+            ],
+            dtype=np.float32,
+        )
 
         homography = cv2.getPerspectiveTransform(src_pts, dst_pts)
-        return homography
+        return homography  # type: ignore[return-value]
 
     def _try_size_based(self) -> Optional[GroundPlaneEstimate]:
         """Create a size-based ground plane estimate.
@@ -533,8 +546,7 @@ class GroundPlaneEstimator:
                 self._smoothed_horizon_y = estimate.horizon_y
             else:
                 self._smoothed_horizon_y = (
-                    alpha * estimate.horizon_y
-                    + (1 - alpha) * self._smoothed_horizon_y
+                    alpha * estimate.horizon_y + (1 - alpha) * self._smoothed_horizon_y
                 )
 
         # Smooth vanishing point
@@ -645,7 +657,7 @@ class GroundPlaneEstimator:
         """
         x1, y1, x2, y2 = bbox
         bbox_height = y2 - y1
-        bbox_width = x2 - x1
+        _bbox_width = x2 - x1  # noqa: F841
         bbox_center_x = (x1 + x2) / 2
         bbox_bottom_y = y2
 
@@ -676,8 +688,7 @@ class GroundPlaneEstimator:
                     # Weight by confidence
                     confidence = self._cached_estimate.confidence
                     blended_distance = (
-                        confidence * z_meters
-                        + (1 - confidence) * size_based_distance
+                        confidence * z_meters + (1 - confidence) * size_based_distance
                     )
                     return float(blended_distance)
 
@@ -766,8 +777,13 @@ class GroundPlaneEstimator:
             # Add label
             label = f"{estimate.method.value} ({estimate.confidence:.2f})"
             cv2.putText(
-                result, label, (10, horizon_y - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2
+                result,
+                label,
+                (10, horizon_y - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2,
             )
 
         # Draw vanishing point

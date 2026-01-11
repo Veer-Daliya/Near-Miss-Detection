@@ -19,23 +19,23 @@ def detect_batch(
 ) -> List[List[Detection]]:
     """
     Detect objects in a batch of frames for better GPU utilization.
-    
+
     Args:
         model: YOLO model instance
         frames: List of input frames (BGR format)
         frame_ids: List of frame identifiers
         confidence_threshold: Minimum confidence for detections
         device: Device to use ('cuda', 'mps', 'cpu')
-    
+
     Returns:
         List of detection lists (one per frame)
     """
     if not frames:
         return []
-    
+
     # Use half precision (FP16) on GPU for faster inference
     half = device in ["cuda", "mps"]
-    
+
     # Batch inference - YOLO handles batching internally
     results = model(
         frames,
@@ -46,28 +46,28 @@ def detect_batch(
         imgsz=640,
         max_det=300,
     )
-    
+
     # Process results for each frame
     all_detections = []
     for frame_idx, result in enumerate(results):
         detections = []
         boxes = result.boxes
-        
+
         for box in boxes:
             # Get class info
             class_id = int(box.cls[0])
             if class_id not in YOLODetector.COCO_CLASSES:
                 continue  # Skip classes we don't care about
-            
+
             class_name = YOLODetector.COCO_CLASSES[class_id]
             confidence = float(box.conf[0])
-            
+
             # Get bounding box (xyxy format)
             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
             bbox = [int(x1), int(y1), int(x2), int(y2)]
-            
+
             frame_id = frame_ids[frame_idx] if frame_idx < len(frame_ids) else frame_idx
-            
+
             detection = Detection(
                 bbox=bbox,
                 class_id=class_id,
@@ -76,9 +76,9 @@ def detect_batch(
                 frame_id=frame_id,
             )
             detections.append(detection)
-        
+
         all_detections.append(detections)
-    
+
     return all_detections
 
 
@@ -109,12 +109,12 @@ class YOLODetector:
             device: Device to use ('cuda', 'mps', 'cpu', or None for auto)
         """
         self.confidence_threshold = confidence_threshold
-        
+
         # Try to find model in data/models/ first, then fall back to Ultralytics auto-download
         model_name = f"yolov10{model_size}.pt"
         project_root = Path(__file__).parent.parent.parent
         local_model_path = project_root / "data" / "models" / model_name
-        
+
         if local_model_path.exists():
             model_path = str(local_model_path)
             print(f"Using local model: {model_path}")
@@ -122,47 +122,54 @@ class YOLODetector:
             # Fall back to Ultralytics auto-download (will download to default location)
             model_path = model_name
             print(f"Model not found locally, will download: {model_name}")
-        
+
         # Auto-detect best device if not specified
         if device is None:
             try:
                 import torch
+
                 if torch.cuda.is_available():
                     device = "cuda"
-                elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                elif (
+                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+                ):
                     device = "mps"  # Apple Silicon GPU
                 else:
                     device = "cpu"
             except ImportError:
                 device = "cpu"
-        
+
         # Optimize GPU settings
         optimize_gpu_settings(device)
-        
+
         self.device = device
-        
+
         # Load model and explicitly set device
         self.model = YOLO(model_path)
-        
+
         # Move model to device explicitly for better GPU utilization
-        if self.device in ["cuda", "mps"]:
+        if self.device is not None and self.device in ["cuda", "mps"]:
             try:
                 import torch
+
                 # Ensure model is on the correct device
                 if hasattr(self.model.model, "to"):
-                    self.model.model.to(self.device)
+                    self.model.model.to(self.device)  # type: ignore
             except Exception:
                 pass  # YOLO handles device placement internally
-        
+
         print(f"YOLO detector using device: {self.device}")
-        
+
         # Print GPU memory info if available
         if self.device == "cuda":
             try:
                 import torch
+
                 if torch.cuda.is_available():
                     print(f"GPU: {torch.cuda.get_device_name(0)}")
-                    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+                    print(
+                        f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB"
+                    )
             except Exception:
                 pass
 
@@ -216,24 +223,23 @@ class YOLODetector:
                 detections.append(detection)
 
         return detections
-    
+
     def detect_batch(
         self, frames: List[np.ndarray], frame_ids: List[int]
     ) -> List[List[Detection]]:
         """
         Detect objects in a batch of frames for better GPU utilization.
-        
+
         This method processes multiple frames at once, which is more efficient
         for GPU inference than processing frames one at a time.
-        
+
         Args:
             frames: List of input frames (BGR format)
             frame_ids: List of frame identifiers
-        
+
         Returns:
             List of detection lists (one per frame)
         """
         return detect_batch(
             self.model, frames, frame_ids, self.confidence_threshold, self.device
         )
-

@@ -4,6 +4,7 @@
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -16,7 +17,9 @@ from src.detect import YOLODetector  # noqa: E402
 from src.filter import filter_pedestrians_in_vehicles  # noqa: E402
 
 
-def draw_detections(image: np.ndarray, detections, color: tuple, label_prefix: str = "") -> np.ndarray:
+def draw_detections(
+    image: np.ndarray, detections, color: tuple, label_prefix: str = ""
+) -> np.ndarray:
     """Draw detections on image with labels."""
     annotated = image.copy()
     for det in detections:
@@ -37,7 +40,7 @@ def draw_detections(image: np.ndarray, detections, color: tuple, label_prefix: s
 
 def test_spatial_filtering(
     image_path: str,
-    output_path: str = None,
+    output_path: Optional[str] = None,
     model_size: str = "m",
     confidence_threshold: float = 0.4,
     overlap_threshold: float = 0.7,
@@ -62,7 +65,9 @@ def test_spatial_filtering(
 
     # Initialize detector
     print("Initializing YOLO detector...")
-    detector = YOLODetector(model_size=model_size, confidence_threshold=confidence_threshold)
+    detector = YOLODetector(
+        model_size=model_size, confidence_threshold=confidence_threshold
+    )
 
     # Run detection
     print("\nRunning detection...")
@@ -70,22 +75,26 @@ def test_spatial_filtering(
 
     # Separate pedestrians and vehicles
     pedestrians_before = [d for d in detections if d.class_name == "person"]
-    vehicles = [d for d in detections if d.class_name in ["car", "truck", "bus", "motorcycle"]]
+    vehicles = [
+        d for d in detections if d.class_name in ["car", "truck", "bus", "motorcycle"]
+    ]
 
-    print(f"\nBefore filtering:")
+    print("\nBefore filtering:")
     print(f"  Total detections: {len(detections)}")
     print(f"  Pedestrians: {len(pedestrians_before)}")
     print(f"  Vehicles: {len(vehicles)}")
 
     # Apply spatial filtering
     print(f"\nApplying spatial filtering (overlap_threshold={overlap_threshold})...")
-    filtered_detections = filter_pedestrians_in_vehicles(detections, overlap_threshold=overlap_threshold)
+    filtered_detections = filter_pedestrians_in_vehicles(
+        detections, overlap_threshold=overlap_threshold
+    )
 
     # Count filtered results
     pedestrians_after = [d for d in filtered_detections if d.class_name == "person"]
     filtered_out = len(pedestrians_before) - len(pedestrians_after)
 
-    print(f"\nAfter filtering:")
+    print("\nAfter filtering:")
     print(f"  Total detections: {len(filtered_detections)}")
     print(f"  Pedestrians: {len(pedestrians_after)}")
     print(f"  Vehicles: {len(vehicles)}")
@@ -93,10 +102,12 @@ def test_spatial_filtering(
 
     # Show which pedestrians were filtered
     if filtered_out > 0:
-        print(f"\nFiltered pedestrians (inside vehicles):")
+        print("\nFiltered pedestrians (inside vehicles):")
         for ped in pedestrians_before:
             if ped not in pedestrians_after:
-                print(f"  - {ped.class_name} at {ped.bbox} (conf: {ped.confidence:.2f})")
+                print(
+                    f"  - {ped.class_name} at {ped.bbox} (conf: {ped.confidence:.2f})"
+                )
 
     # Create visualization
     print("\nCreating visualization...")
@@ -135,9 +146,11 @@ def test_spatial_filtering(
     else:
         # Auto-generate output path
         input_path = Path(image_path)
-        output_path = input_path.parent / f"{input_path.stem}_filtering_test{input_path.suffix}"
-        cv2.imwrite(str(output_path), combined)
-        print(f"\nAnnotated image saved to: {output_path}")
+        auto_output_path = (
+            input_path.parent / f"{input_path.stem}_filtering_test{input_path.suffix}"
+        )
+        cv2.imwrite(str(auto_output_path), combined)
+        print(f"\nAnnotated image saved to: {auto_output_path}")
 
     print("\n" + "=" * 60)
     print("SUMMARY")
@@ -196,4 +209,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

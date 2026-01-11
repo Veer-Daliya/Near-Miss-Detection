@@ -4,7 +4,7 @@
 import argparse
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -20,7 +20,7 @@ from src.detect.detection_types import Detection  # noqa: E402
 
 def test_line_detection_image(
     image_path: str,
-    output_path: str = None,
+    output_path: Optional[str] = None,
     canny_low: int = 50,
     canny_high: int = 150,
     hough_threshold: int = 50,
@@ -131,8 +131,8 @@ def draw_detections(
 
 def test_line_detection_video(
     video_path: str,
-    output_path: str = None,
-    max_frames: int = None,
+    output_path: Optional[str] = None,
+    max_frames: Optional[int] = None,
     canny_low: int = 50,
     canny_high: int = 150,
     hough_threshold: int = 50,
@@ -177,7 +177,7 @@ def test_line_detection_video(
     # Initialize video writer if output path is provided
     writer = None
     if output_path:
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
         writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         print(f"Will save output to {output_path}")
 
@@ -191,7 +191,7 @@ def test_line_detection_video(
         temporal_smoothing=True,
         smoothing_alpha=0.7,  # 70% weight to new detection, 30% to previous
     )
-    
+
     # Initialize YOLO detector if detections are requested
     yolo_detector = None
     if show_detections:
@@ -211,16 +211,18 @@ def test_line_detection_video(
     frame_skip = 5  # Process every 5th frame for detection, but draw on all frames
 
     print("Processing video frames...")
-    print("Note: Lines detected every 5 frames, but drawn on all frames for smooth visualization")
-    
+    print(
+        "Note: Lines detected every 5 frames, but drawn on all frames for smooth visualization"
+    )
+
     # Store detected lines for drawing on skipped frames
     current_lane_lines: List[Line] = []
     current_road_edges: List[Line] = []
     current_all_lines: List[Line] = []
-    
+
     # Store detections
     current_detections: List[Detection] = []
-    
+
     # For stable counter display (running average)
     line_count_history: List[int] = []
     lane_count_history: List[int] = []
@@ -237,21 +239,21 @@ def test_line_detection_video(
         # Detect lines every N frames
         if frame_count % frame_skip == 0:
             processed_frames += 1
-            
+
             # Detect lines
             current_all_lines = detector.detect_lines(frame)
             current_lane_lines = detector.detect_lane_markings(frame)
             current_road_edges = detector.detect_road_edges(frame)
-            
+
             # Detect objects if requested
             if show_detections and yolo_detector:
                 current_detections = yolo_detector.detect(frame, frame_id=frame_count)
-            
+
             # Update count history for stable display
             line_count_history.append(len(current_all_lines))
             lane_count_history.append(len(current_lane_lines))
             edge_count_history.append(len(current_road_edges))
-            
+
             # Keep only last N counts
             if len(line_count_history) > history_window:
                 line_count_history.pop(0)
@@ -267,7 +269,9 @@ def test_line_detection_video(
 
             # Draw all lines in gray
             for line in current_all_lines:
-                cv2.line(result, (line.x1, line.y1), (line.x2, line.y2), (128, 128, 128), 1)
+                cv2.line(
+                    result, (line.x1, line.y1), (line.x2, line.y2), (128, 128, 128), 1
+                )
 
             # Draw lane markings in green
             for line in current_lane_lines:
@@ -276,16 +280,18 @@ def test_line_detection_video(
             # Draw road edges in blue
             for line in current_road_edges:
                 cv2.line(result, (line.x1, line.y1), (line.x2, line.y2), (255, 0, 0), 2)
-            
+
             # Draw detections if requested
             if show_detections:
                 # Separate pedestrians and vehicles
-                pedestrians = [d for d in current_detections if d.class_name == "person"]
+                pedestrians = [
+                    d for d in current_detections if d.class_name == "person"
+                ]
                 vehicles = [d for d in current_detections if d.class_name != "person"]
-                
+
                 # Draw pedestrians in red
                 result = draw_detections(result, pedestrians, (0, 0, 255), "PED ")
-                
+
                 # Draw vehicles in yellow
                 result = draw_detections(result, vehicles, (0, 255, 255), "VEH ")
 
@@ -298,7 +304,7 @@ def test_line_detection_video(
             avg_lines = len(current_all_lines)
             avg_lanes = len(current_lane_lines)
             avg_edges = len(current_road_edges)
-        
+
         # Add text overlay with stable counts
         cv2.putText(
             result,
@@ -324,7 +330,9 @@ def test_line_detection_video(
             break
 
         if processed_frames % 10 == 0:
-            print(f"Processed {processed_frames} detection cycles ({frame_count} total frames)...")
+            print(
+                f"Processed {processed_frames} detection cycles ({frame_count} total frames)..."
+            )
 
     cap.release()
     if writer:
@@ -332,7 +340,9 @@ def test_line_detection_video(
         print(f"Saved annotated video to {output_path}")
     cv2.destroyAllWindows()
 
-    print(f"Processed {processed_frames} detection cycles ({frame_count} total frames) from video")
+    print(
+        f"Processed {processed_frames} detection cycles ({frame_count} total frames) from video"
+    )
 
 
 def main() -> None:
@@ -450,9 +460,10 @@ def main() -> None:
         )
     else:
         print(f"Error: Unsupported file format: {source_path.suffix}")
-        print("Supported formats: images (.jpg, .png, .bmp) or videos (.mp4, .mov, .avi, .mkv)")
+        print(
+            "Supported formats: images (.jpg, .png, .bmp) or videos (.mp4, .mov, .avi, .mkv)"
+        )
 
 
 if __name__ == "__main__":
     main()
-

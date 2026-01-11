@@ -142,4 +142,3 @@ def separate_pedestrians_and_vehicles(
     vehicles = [d for d in detections if d.class_name in _VEHICLE_CLASSES]
 
     return pedestrians, vehicles
-

@@ -16,7 +16,12 @@ def _bbox_points_to_rect(bbox_points: List[List[float]]) -> tuple[int, int, int,
     """Convert bbox points to [x1, y1, x2, y2] rectangle coordinates."""
     x_coords = [point[0] for point in bbox_points]
     y_coords = [point[1] for point in bbox_points]
-    return int(min(x_coords)), int(min(y_coords)), int(max(x_coords)), int(max(y_coords))
+    return (
+        int(min(x_coords)),
+        int(min(y_coords)),
+        int(max(x_coords)),
+        int(max(y_coords)),
+    )
 
 
 class PlateDetector:
@@ -53,7 +58,7 @@ class PlateDetector:
         try:
             import paddle
             import os
-            
+
             # Try to set GPU device if available
             if paddle.device.is_compiled_with_cuda():
                 try:
@@ -73,7 +78,7 @@ class PlateDetector:
         except (ImportError, AttributeError):
             # PaddlePaddle not available or error
             gpu_available = False
-        
+
         # Initialize PaddleOCR
         # PaddleOCR will use GPU if PaddlePaddle device is set to GPU
         # Try with use_angle_cls, fallback without it for newer versions
@@ -82,7 +87,7 @@ class PlateDetector:
         except (TypeError, ValueError):
             # Newer PaddleOCR versions may not support use_angle_cls
             self.ocr = PaddleOCR(lang="en")
-        
+
         if gpu_available:
             print("Plate detector initialized with GPU acceleration")
         else:
@@ -119,13 +124,13 @@ class PlateDetector:
 
             # Handle new PaddleOCR API (OCRResult object) vs old API (list)
             ocr_result = results[0] if isinstance(results, list) else results
-            
+
             # Check if it's the new OCRResult format
-            if hasattr(ocr_result, 'text_lines') or hasattr(ocr_result, 'rec_res'):
+            if hasattr(ocr_result, "text_lines") or hasattr(ocr_result, "rec_res"):
                 # New API format - extract from OCRResult object
-                if hasattr(ocr_result, 'text_lines') and ocr_result.text_lines:
+                if hasattr(ocr_result, "text_lines") and ocr_result.text_lines:
                     text_lines = ocr_result.text_lines
-                elif hasattr(ocr_result, 'rec_res') and ocr_result.rec_res:
+                elif hasattr(ocr_result, "rec_res") and ocr_result.rec_res:
                     text_lines = ocr_result.rec_res
                 else:
                     return []
@@ -140,14 +145,14 @@ class PlateDetector:
             for line in text_lines:
                 if not line:
                     continue
-                
+
                 # Handle different line formats
                 if isinstance(line, tuple) and len(line) == 2:
                     bbox_points, (_, confidence) = line
                 elif isinstance(line, dict):
                     # New format might be dict
-                    bbox_points = line.get('bbox', [])
-                    confidence = line.get('confidence', 0.0)
+                    bbox_points = line.get("bbox", [])
+                    confidence = line.get("confidence", 0.0)
                 else:
                     continue
 
@@ -195,7 +200,10 @@ class PlateDetector:
             # Log error for debugging (but don't fail completely)
             # This can happen with very small or corrupted ROIs
             import sys
-            print(f"Warning: Plate detection error on vehicle ROI: {e}", file=sys.stderr)
+
+            print(
+                f"Warning: Plate detection error on vehicle ROI: {e}", file=sys.stderr
+            )
             pass
 
         return plates
@@ -224,4 +232,3 @@ class PlateDetector:
             plates.extend(roi_plates)
 
         return plates
-
